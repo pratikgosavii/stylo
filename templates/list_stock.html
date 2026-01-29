@@ -1,0 +1,221 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Categories List{% endblock title %}
+
+
+{% block extra_css %}
+    <!-- plugin css -->
+    <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet"
+          type="text/css"/>
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+    />
+    <style>
+        body {
+            background-color: gainsboro;
+            color: #775599;;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background-color: #775599;;
+            color: #ffffff;
+            border-radius: 8px 8px 0 0;
+            padding: 20px;
+        }
+
+        .card-title {
+            margin: 0;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .table thead {
+            background-color: gray;
+            color: white;
+        }
+
+        .table tbody tr {
+            background-color: white;
+            color: black;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f0d28c;
+            color: #775599;;
+        }
+
+        .status-approved {
+            color: rgb(80, 244, 80);
+            font-weight: bold;
+        }
+
+        .status-pending {
+            color: blue;
+            font-weight: bold;
+        }
+
+        .status-not-approved {
+            color: red;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .table-responsive {
+                overflow-x: auto;
+            }
+        }
+    </style>
+
+    <style>
+  .card {
+    border-radius: 10px;
+    transition: all 0.3s ease-in-out;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  }
+  .btn-warning {
+    background-color: #ffb300;
+    border: none;
+  }
+</style>
+
+
+{% endblock extra_css %}
+
+{% block content %}
+
+    <!-- ============================================================== -->
+    <!-- Start right Content here -->
+    <!-- ============================================================== -->
+    <div class="main-content">
+        <div class="page-content">
+            <div class="container-fluid">
+                <!-- start page title -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                            <h4 class="mb-sm-0 font-size-18">List Stock</h4>
+                        </div>
+                    </div>
+                </div>
+
+                
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold">Products</h4>
+    <a href="{% url 'add_product' %}" class="btn btn-warning fw-semibold">Add Product</a>
+  </div>
+
+  <!-- Filter Section -->
+   
+    <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex gap-2">
+    <a href="?sale_type=all" class="btn btn-sm {% if current_filter == 'all' %}btn-warning{% else %}btn-outline-secondary{% endif %}">All</a>
+    <a href="?sale_type=online" class="btn btn-sm {% if current_filter == 'online' %}btn-warning{% else %}btn-outline-secondary{% endif %}">Online</a>
+    <a href="?sale_type=offline" class="btn btn-sm {% if current_filter == 'offline' %}btn-warning{% else %}btn-outline-secondary{% endif %}">Offline</a>
+  </div>
+
+  <form method="get" class="d-flex align-items-center">
+    <input type="hidden" name="sale_type" value="{{ current_filter }}">
+    <input type="text" name="search" placeholder="Search Product/Service" value="{{ search_query }}" class="form-control form-control-sm me-2" style="width: 250px;">
+    <button type="submit" class="btn btn-sm btn-warning">Search</button>
+  </form>
+</div>
+
+<hr>
+
+
+    
+  </div>
+
+  <!-- Product Grid -->
+  <div class="row g-3">
+    {% for item in data %}
+      <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div class="card shadow-sm position-relative h-100">
+          <!-- Top Left Stock Label -->
+          <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2">
+            {{ item.stock_cached|default:"0" }} Pieces Left
+          </span>
+
+          <!-- Delete Button -->
+          {% comment %} <a href="{% url 'delete_product' item.id %}" 
+             class="position-absolute top-0 end-0 m-2 text-danger" title="Delete">
+            <i class="bi bi-trash-fill fs-5"></i>
+          </a> {% endcomment %}
+
+          <!-- Product Image -->
+          {% if item.image %}
+            <img src="{{ item.image.url }}" class="card-img-top" style="height: 180px; object-fit: cover;">
+          {% else %}
+            <img src="{% static 'images/no_image.png' %}" class="card-img-top" style="height: 180px; object-fit: cover;">
+          {% endif %}
+
+          <div class="card-body text-center">
+            <h6 class="fw-bold mb-1">{{ item.name }}</h6>
+            <p class="text-muted small mb-2">{{ item.description|truncatechars:35 }}</p>
+
+            <!-- Online/Offline Toggle -->
+            <div class="form-check form-switch d-flex justify-content-center">
+              <input class="form-check-input" type="checkbox" role="switch" id="activeSwitch{{ forloop.counter }}" 
+                     {% if item.is_active %}checked{% endif %}>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <p class="text-center text-muted">No products found.</p>
+    {% endfor %}
+  </div>
+</div>
+
+
+
+            </div>
+            <!-- container-fluid -->
+        </div>
+        <!-- End Page-content -->
+
+        {% block footer %}
+            {% include 'partials/footer.html' %}
+        {% endblock footer %}
+    </div>
+    <!-- end main content-->
+{% endblock content %}
+
+{% block extra_js %}
+    <script>
+        // Auto-hide toast after 5 seconds
+        setTimeout(() => {
+            const toastElement = document.getElementById("toast");
+            if (toastElement) {
+                toastElement.classList.remove("show"); // Hide toast
+                setTimeout(() => {
+                    toastElement.remove(); // Remove from DOM
+                }, 500); // Wait for fade-out animation
+            }
+        }, 5000);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Plugins js-->
+    <script src="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.min.js' %}"></script>
+    <script src="{% static 'libs/admin-resources/jquery.vectormap/maps/jquery-jvectormap-world-mill-en.js' %}"></script>
+    <script src="{% static 'js/pages/allchart.js' %}"></script>
+    <!-- dashboard init -->
+    <script src="{% static 'js/pages/dashboard.init.js' %}"></script>
+
+{% endblock extra_js %}

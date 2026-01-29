@@ -1,0 +1,157 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Sales List{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .sale-card {
+        margin-bottom: 2rem;
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
+    }
+    .sale-header {
+        background-color: #ffdb8a;
+        color: black;
+        padding: 10px 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    .sale-items table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .sale-items th, .sale-items td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+    }
+    .sale-items th {
+        background-color: gray;
+        color: white;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+
+
+
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">Sales List</h4>
+                    </div>
+                </div>
+            </div>
+
+
+
+<div class="container">
+
+    {% if data %}
+        {% for sale in data %}
+   <div class="sale-card">
+    <div class="sale-header d-flex justify-content-between align-items-center">
+    <div>
+        Sale #{{ sale.id }} - {{ sale.party.name }} - Created at: {{ sale.created_at|date:"M d, Y H:i" }}
+    </div>
+    <div>
+        <a href="{% url 'bill_details_view' sale.id %}" class="btn btn-sm btn-primary me-1">Edit</a>
+        <a href="{% url 'delete_sale' sale.id %}" class="btn btn-sm btn-danger"
+           onclick="return confirm('Are you sure you want to delete this sale?');">
+           Delete
+        </a>
+    </div>
+</div>
+
+
+    <div class="sale-summary mt-2">
+        <div>
+            Total Items: {{ sale.total_items }}<br>
+            Total Amount: ₹{{ sale.total_amount }}<br>
+            Tax ({{ sale.tax_percentage }}%): ₹{{ sale.total_tax }}<br>
+            Discount({{ sale.discount_percentage }}%): {{ sale.total_discount }}<br>
+            <strong>Final Amount: ₹{{ sale.total_amount }}</strong>
+        </div>
+        <div>
+            <strong> Wholesale Bill?: {{ sale.is_wholesale_rate|yesno:"Yes,No" }}</strong>
+
+        </div>
+    </div>
+
+    <!-- 🔻 This is the toggle button -->
+    <div class="text-end mt-2">
+
+         <a href="{% url 'sale_bill_details' sale.id %}"> <button class="btn btn-sm btn-outline-secondary toggle-pos" style="color:black;">
+                View Bill
+            </button> </a>
+            
+        <a href={% url 'sale_invoice' sale.id %}  >  <button class="btn btn-sm btn-outline-secondary toggle-pos" style="color:black;">Download Invoice</button> </a>
+
+        {% if sale.wholesales.all %}
+          
+            <button class="btn btn-sm btn-outline-secondary toggle-pos" style="color:black;" data-sale="{{ sale.id }}">
+                Show Wholesale Details
+            </button>
+        {% endif %}
+
+    </div>
+
+    <!-- 🔻 This part is hidden by default and shown only when clicked -->
+    <div id="pos-details-{{ sale.id }}" class="mt-2" style="display: none;">
+        {% for wholesale in sale.wholesales.all %}
+            <div class="card p-3 bg-light border">
+                <h6>POS Wholesale Invoice</h6>
+                <strong>Invoice No:</strong> {{ wholesale.invoice_number }}<br>
+                <strong>Type:</strong> {{ wholesale.get_invoice_type_display }}<br>
+                <strong>Date:</strong> {{ wholesale.date }}<br>
+                <strong>Dispatch Address:</strong> {{ wholesale.dispatch_address }}<br>
+                <strong>Vehicle Number:</strong> {{ wholesale.vehicle_number }}<br>
+                <strong>Number of Parcels:</strong> {{ wholesale.number_of_parcels }}<br>
+                <strong>Transport:</strong> {{ wholesale.transport_name }}<br>
+                <strong>Charges:</strong> ₹{{ wholesale.delivery_charges }} / ₹{{ wholesale.packaging_charges }}<br>
+            </div>
+        {% empty %}
+            <p class="text-muted">No POS invoice info available.</p>
+        {% endfor %}
+    </div>
+</div>
+
+       
+        {% endfor %}
+    {% else %}
+        <p>No sales found.</p>
+    {% endif %}
+</div>
+
+ </div>
+        </div>
+        </div>
+{% endblock content %}
+
+{% block extra_js %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.toggle-pos').forEach(button => {
+            button.addEventListener('click', function () {
+                const saleId = button.getAttribute('data-sale');
+                const target = document.getElementById(`pos-details-${saleId}`);
+                const isVisible = target.style.display === 'block';
+
+                target.style.display = isVisible ? 'none' : 'block';
+                button.textContent = isVisible ? 'Show POS Details' : 'Hide POS Details';
+            });
+        });
+    });
+</script>
+
+
+
+{% endblock extra_js %}

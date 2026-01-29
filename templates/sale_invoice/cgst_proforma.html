@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Proforma Invoice (CGST)</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        border: 2px solid #000;
+        margin: 10px;
+        padding: 10px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid black;
+        padding-bottom: 5px;
+      }
+
+      .logo {
+        width: 80px;
+        height: 80px;
+        background: #ccc;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 80px;
+        font-weight: bold;
+        flex-shrink: 0;
+      }
+
+      .company-details {
+        flex-grow: 1;
+        margin-left: 15px;
+      }
+
+      .company-details h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .invoice-details {
+        text-align: right;
+        font-size: 13px;
+      }
+
+      .invoice-details h3 {
+        margin: 0;
+        color: #232182;
+        font-size: 15px;
+      }
+
+      .details {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+
+      .details td {
+        border: 1px solid black;
+        padding: 5px;
+        vertical-align: top;
+      }
+
+      .items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .items th,
+      .items td {
+        border: 1px solid black;
+        padding: 4px;
+        text-align: center;
+      }
+
+      .items th {
+        background: #f2f2f2;
+      }
+
+      .items th:nth-child(1) {
+        width: 5%;
+      } /* S.No. */
+      .items th:nth-child(2) {
+        width: 22%;
+      } /* Item */
+      .items th:nth-child(3) {
+        width: 10%;
+      } /* HSN/SAC */
+      .items th:nth-child(4) {
+        width: 10%;
+      } /* Rate */
+      .items th:nth-child(5) {
+        width: 10%;
+      } /* Qty Unit */
+      .items th:nth-child(6) {
+        width: 13%;
+      } /* Taxable Value */
+      .items th:nth-child(7) {
+        width: 10%;
+      } /* SGST/CGST */
+      .items th:nth-child(8) {
+        width: 10%;
+      } /* Total */
+
+      .totals-section {
+        border: 1px solid #000;
+        display: flex;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .totals-left {
+        width: 60%;
+        border-right: 1px solid #000;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .totals-left-top {
+        padding: 10px;
+        line-height: 2;
+        border-bottom: 1px solid #000;
+      }
+
+      .totals-left-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 10px;
+      }
+
+      .bank-details {
+        line-height: 1.6;
+      }
+
+      .qr-box {
+        text-align: center;
+      }
+
+      .qr-box div {
+        width: 90px;
+        height: 90px;
+        background: #ddd;
+        margin: auto;
+      }
+
+      .totals-right {
+        width: 40%;
+      }
+
+      .totals-right table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .totals-right td {
+        padding: 4px 8px;
+        border: none;
+      }
+
+      .totals-right tr.total td {
+        border-top: 1px solid #000;
+        font-weight: bold;
+      }
+
+      .totals-right tr.balance td {
+        border-top: 1px solid #000;
+        font-weight: bold;
+      }
+
+      .totals-right td:nth-child(1) {
+        text-align: left;
+      }
+
+      .totals-right td:nth-child(2) {
+        text-align: right;
+      }
+
+      .tax-summary {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .tax-summary th,
+      .tax-summary td {
+        border: 1px solid black;
+        padding: 5px;
+        text-align: center;
+      }
+
+      .tax-summary th {
+        background: #f2f2f2;
+      }
+
+      .footer {
+        margin-top: 10px;
+        font-size: 12px;
+      }
+
+      .footer strong {
+        display: block;
+        margin-top: 5px;
+      }
+
+      .signature {
+        text-align: right;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+
+      .page-no {
+        text-align: right;
+        font-size: 12px;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- HEADER -->
+      <div class="header">
+        <div class="logo">
+          {% if sale_instance.company_profile and sale_instance.company_profile.profile_image %}
+          <img src="{{ sale_instance.company_profile.profile_image.url }}" alt="Logo" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" />
+          {% else %}
+          Logo
+          {% endif %}
+        </div>
+        <div class="company-details">
+          <h2>{{ sale_instance.company_profile.company_name|default:sale_instance.company_profile.brand_name }}</h2>
+          {% if sale_instance.company_profile.address_line_1 %}{{ sale_instance.company_profile.address_line_1 }}<br />{% endif %}
+          {% if sale_instance.company_profile.address_line_2 %}{{ sale_instance.company_profile.address_line_2 }}<br />{% endif %}
+          {% if sale_instance.company_profile.state %}State: {{ sale_instance.company_profile.state.name }}{% endif %}<br />
+          GSTIN : {{ sale_instance.company_profile.gstin|default:"-" }} &nbsp;&nbsp; PAN : {{ sale_instance.company_profile.pan|default:"-" }}<br />
+          Mobile : {{ sale_instance.company_profile.contact|default:"-" }} &nbsp;&nbsp; Email : {{ sale_instance.company_profile.email|default:"-" }}<br />
+          {% if wholesale.reverse_charges %}<b>Reverse Charge</b>{% endif %}
+        </div>
+        <div class="invoice-details">
+          <h3>PROFORMA INVOICE</h3>
+          ORIGINAL FOR RECIPIENT<br />
+          Invoice Date: {{ wholesale.date|default:sale_instance.created_at|date:"d/m/Y" }}<br />
+          Invoice No: {{ wholesale.invoice_number }}
+        </div>
+      </div>
+
+      <!-- CUSTOMER SECTION -->
+      <table class="details">
+        <tr>
+          <td width="33%">
+            <b>Customer Details:</b><br />
+            {{ sale_instance.customer.company_name|default:sale_instance.customer.name }}<br />
+            GSTIN : {{ sale_instance.customer.gst_number|default:"-" }}<br />
+            PAN : {{ sale_instance.customer.pan_number|default:"-" }}<br />
+            Aadhar : {{ sale_instance.customer.aadhar_number|default:"-" }}<br />
+            Ph : {{ sale_instance.customer.contact|default:"-" }}
+          </td>
+          <td width="33%">
+            <b>Billing Address :</b><br />
+            {% if sale_instance.customer.billing_address_line1 %}{{ sale_instance.customer.billing_address_line1 }}<br />{% endif %}
+            {% if sale_instance.customer.billing_address_line2 %}{{ sale_instance.customer.billing_address_line2 }}<br />{% endif %}
+            {% if sale_instance.customer.billing_city %}{{ sale_instance.customer.billing_city }}{% endif %}{% if sale_instance.customer.billing_state %}, {{ sale_instance.customer.billing_state }}{% endif %}{% if sale_instance.customer.billing_pincode %} - {{ sale_instance.customer.billing_pincode }}{% endif %}<br /><br />
+            <b>Delivery Address :</b><br />
+            {% if sale_instance.customer.dispatch_address_line1 %}{{ sale_instance.customer.dispatch_address_line1 }}<br />{% endif %}
+            {% if sale_instance.customer.dispatch_address_line2 %}{{ sale_instance.customer.dispatch_address_line2 }}<br />{% endif %}
+            {% if sale_instance.customer.dispatch_city %}{{ sale_instance.customer.dispatch_city }}{% endif %}{% if sale_instance.customer.dispatch_state %}, {{ sale_instance.customer.dispatch_state }}{% endif %}{% if sale_instance.customer.dispatch_pincode %} - {{ sale_instance.customer.dispatch_pincode }}{% endif %}
+          </td>
+          <td>
+            <b>Reference :</b> {{ wholesale.references|default:"-" }}<br />
+            <b>Due Date :</b> {% if sale_instance.due_date %}{{ sale_instance.due_date|date:"d/m/Y" }}{% else %}-{% endif %}<br />
+            <b>Invoice # :</b> {{ wholesale.invoice_number }}<br />
+            <b>Delivery City :</b> {{ wholesale.delivery_city|default:sale_instance.customer.dispatch_city|default:"-" }}
+          </td>
+        </tr>
+      </table>
+
+      <!-- ITEMS TABLE -->
+      <table class="items">
+        <thead>
+          <tr>
+            <th>S.No.</th>
+            <th>Item</th>
+            <th>HSN/SAC</th>
+            <th>Rate</th>
+            <th>Qty Unit</th>
+            <th>Taxable Value</th>
+            <th>SGST(%)</th>
+            <th>CGST(%)</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in sale_instance.items.all %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.product.hsn|default:"-" }}</td>
+            <td>{{ item.price|floatformat:2 }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.amount|floatformat:2 }}</td>
+            <td>{{ item.product.sgst_rate|default:"0" }}%</td>
+            <td>{{ item.product.cgst_rate|default:"0" }}%</td>
+            <td>{{ item.total_with_tax|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- TOTALS SECTION -->
+      <div class="totals-section">
+        <!-- LEFT -->
+        <div class="totals-left">
+          <div class="totals-left-top">
+            <b>Total Quantity :</b> {{ total_quantity }}<br />
+            <b>Total value in words :</b> {{ total_in_words }}
+          </div>
+          <div class="totals-left-bottom">
+            <div class="bank-details">
+              <b>Bank Details :</b><br />
+              Bank : {{ sale_instance.advance_bank.name|default:"-" }}<br />
+              Account Holder : {{ sale_instance.advance_bank.account_holder|default:"-" }}<br />
+              Account No : {{ sale_instance.advance_bank.account_number|default:"-" }}<br />
+              IFSC Code : {{ sale_instance.advance_bank.ifsc_code|default:"-" }}<br />
+              Branch : {{ sale_instance.advance_bank.branch|default:"-" }}<br />
+              UPI Id : {{ sale_instance.company_profile.upi_id|default:"-" }}
+            </div>
+            <div class="qr-box">
+              {% if sale_instance.company_profile and sale_instance.company_profile.payment_qr %}
+              <img src="{{ sale_instance.company_profile.payment_qr.url }}" alt="QR" style="width:90px;height:90px;object-fit:cover;margin:auto;" />
+              {% else %}
+              <div>QR</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="totals-right">
+          <table>
+            <tr>
+              <td>Taxable Amount</td>
+              <td>{{ sum_taxable|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td>SGST</td>
+              <td>{{ sum_sgst|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td>CGST</td>
+              <td>{{ sum_cgst|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td>Discount ({{ discount_percentage|default:"0" }}%)</td>
+              <td>{{ discount_amount|default:"0.00" }}</td>
+            </tr>
+            <tr>
+              <td>Delivery Charges</td>
+              <td>{{ wholesale.delivery_charges|default:"0.00" }}</td>
+            </tr>
+            <tr>
+              <td>Package Charges</td>
+              <td>{{ wholesale.packaging_charges|default:"0.00" }}</td>
+            </tr>
+            <tr>
+              <td>Round off</td>
+              <td>{{ round_off_value|floatformat:2 }}</td>
+            </tr>
+            <tr class="total">
+              <td>Total Amount</td>
+              <td>{{ rounded_total|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <td>Paid</td>
+              <td>{{ paid_amount|floatformat:2 }}</td>
+            </tr>
+            <tr class="balance">
+              <td>Balance</td>
+              <td>{{ balance_amount|floatformat:2 }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- HSN SUMMARY -->
+      <table class="tax-summary">
+        <tr>
+          <th>HSN / SAC</th>
+          <th>Taxable Value</th>
+          <th>SGST(%)</th>
+          <th>Amount</th>
+          <th>CGST(%)</th>
+          <th>Amount</th>
+          <th>Total Tax Amount</th>
+        </tr>
+        {% for hsn, data in hsn_summary %}
+        <tr>
+          <td height="40">{{ hsn }}</td>
+          <td>{{ data.taxable_value|floatformat:2 }}</td>
+          <td>{{ data.sgst_rate|default:"0" }}%</td>
+          <td>{{ data.sgst_amount|floatformat:2 }}</td>
+          <td>{{ data.cgst_rate|default:"0" }}%</td>
+          <td>{{ data.cgst_amount|floatformat:2 }}</td>
+          <td>{{ data.total_tax|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td colspan="6" style="text-align: right"><b>Total</b></td>
+          <td>{{ total_tax|floatformat:2 }}</td>
+        </tr>
+      </table>
+
+      <!-- FOOTER -->
+      <div class="footer">
+        <strong>Notes:</strong> {{ wholesale.notes|default:"-" }}
+        <strong>Terms & Conditions:</strong>
+        {{ wholesale.terms|default:"-" }}
+      </div>
+
+      <div class="signature">Authorized Signature</div>
+      <div class="page-no">Page no. 1/1</div>
+    </div>
+  </body>
+</html>

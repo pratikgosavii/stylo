@@ -1,0 +1,117 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Day Book{% endblock title %}
+
+{% block extra_css %}
+    <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body { background-color: gainsboro; color: #775599; }
+        .card { background-color: #ffffff; border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card-header { background-color: #775599; color: #ffffff; border-radius: 8px 8px 0 0; padding: 20px; }
+        .tile { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 14px; min-width: 150px; }
+        .tile h6 { margin: 0; font-weight: 700; }
+        .tile .value { font-size: 18px; }
+        .table thead { background-color: gray; color: white; }
+        .table tbody tr { background-color: white; color: black; }
+        .table tbody tr:hover { background-color: #f0d28c; color: #775599; }
+    </style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12 d-flex align-items-center justify-content-between">
+                    <h4 class="mb-sm-0 font-size-18">Day Book</h4>
+                    <form method="get" action="" class="d-flex align-items-center">
+                        <input type="date" name="date" value="{{ date }}" class="form-control me-2" style="max-width: 200px;">
+                        <button class="btn btn-outline-warning" style="color: black; border: 2px solid #ffcc5a;">Apply</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row mt-3 g-2">
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Sales</h6><div class="value">{{ tiles.sales.total }}</div></div></div>
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Purchase</h6><div class="value">{{ tiles.purchases.total }}</div></div></div>
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Stock</h6><div class="value">{{ tiles.stock.count }}</div></div></div>
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Receipts</h6><div class="value">{{ tiles.receipts.total }}</div></div></div>
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Payments</h6><div class="value">{{ tiles.payments.total }}</div></div></div>
+                <div class="col-6 col-md-4 col-lg-2"><div class="tile"><h6>Expenses</h6><div class="value">{{ tiles.expenses.total }}</div></div></div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header"><h5 class="card-title mb-0">Balances</h5></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Opening</th>
+                                    <th>Closing</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Cash in hand</td>
+                                    <td>{{ accounts.cash_in_hand.opening }}</td>
+                                    <td>{{ accounts.cash_in_hand.closing }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Bank Balance</td>
+                                    <td>{{ accounts.bank_balance.opening }}</td>
+                                    <td>{{ accounts.bank_balance.closing }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Medium</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Time</th>
+                                    <th>Ref</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for e in entries %}
+                                <tr>
+                                    <td>{{ e.type }}</td>
+                                    <td>{{ e.medium }}</td>
+                                    <td>{{ e.debit }}</td>
+                                    <td>{{ e.credit }}</td>
+                                    <td>{{ e.time|date:"H:i:s" }}</td>
+                                    <td>{{ e.reference_id|default:"-" }}</td>
+                                    <td>{{ e.description|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="7" class="text-center">No entries for this day.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+</div>
+{% endblock content %}
+
+

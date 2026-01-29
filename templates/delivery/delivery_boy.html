@@ -1,0 +1,69 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Create Category{% endblock title %}
+{% block content %}
+
+
+
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- start page title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">Delivery Boy</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div class="form-container">
+
+                    <form method="POST" enctype="multipart/form-data" class="mb-4">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            {{ form.name.label_tag }} {{ form.name }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.mobile.label_tag }} {{ form.mobile }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.photo.label_tag }} {{ form.photo }}
+                        </div>
+                        <button class="btn btn-success">Create</button>
+                    </form>
+
+                    <h5>Delivery Boys</h5>
+                    <div class="row">
+                        {% for boy in delivery_boys %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                {% if boy.photo %}
+                                <img src="{{ boy.photo.url }}" class="card-img-top" alt="{{ boy.name }}">
+                                {% endif %}
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ boy.name }}</h6>
+                                    <p class="card-text mb-1">Mobile: {{ boy.mobile }}</p>
+                                    <p class="card-text mb-1">Deliveries: {{ boy.total_deliveries }}</p>
+                                    <span class="badge bg-{{ boy.is_active|yesno:'success,danger' }}">{{ boy.is_active|yesno:'Active,Inactive' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+ {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+
+                {% endblock %}
+
+

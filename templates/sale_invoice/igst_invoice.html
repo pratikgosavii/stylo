@@ -1,0 +1,149 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Invoice - {{ wholesale.invoice_number }}</title>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 12px; margin:0; padding:0; color:#000; }
+    .invoice-box { width: 800px; margin: auto; border: 1px solid #000; padding: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; }
+    .no-border td { border: none !important; padding: 3px; }
+    .header-title { text-align: center; font-weight: bold; color: blue; padding: 5px; }
+    .company-logo { width: 50px; height: 50px; border-radius: 50%; background:#ccc; text-align:center; line-height:50px; font-size:12px; margin-right:10px; }
+    .summary td { border: none; text-align: right; padding: 3px 6px; }
+    .terms { height: 60px; font-size: 11px; text-align: left; padding: 5px; }
+    .footer { text-align: center; font-size: 11px; margin-top: 5px; }
+    .bold { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="invoice-box">
+
+    <!-- Title -->
+    <table class="no-border">
+        <tr><td class="header-title">TAX INVOICE</td></tr>
+    </table>
+
+    <!-- Company Info -->
+    <table class="no-border">
+        <tr>
+            <td style="width:60px; text-align:center;">
+                {% if sale_instance.company_profile and sale_instance.company_profile.profile_image %}
+                    <img src="{{ sale_instance.company_profile.profile_image.url }}" width="50" height="50">
+                {% else %}
+                    <div class="company-logo">Logo</div>
+                {% endif %}
+            </td>
+            <td style="text-align:left;">
+                <div class="bold">{{ sale_instance.company_profile.company_name|default:sale_instance.company_profile.brand_name }}</div>
+                {% if sale_instance.company_profile.address_line_1 %}{{ sale_instance.company_profile.address_line_1 }}<br>{% endif %}
+                {% if sale_instance.company_profile.address_line_2 %}{{ sale_instance.company_profile.address_line_2 }}<br>{% endif %}
+                {% if sale_instance.company_profile.state %}State: {{ sale_instance.company_profile.state.name }}{% endif %}
+            </td>
+            <td style="text-align:right;">
+                GSTIN - {{ sale_instance.company_profile.gstin|default:"Unregistered" }}<br>
+                <b>Invoice Date:</b> {{ wholesale.date|default:sale_instance.created_at|date:"d/m/Y" }}<br>
+                <b>Invoice No.:</b> {{ wholesale.invoice_number }}<br>
+                <b>Composite Scheme</b><br>
+                <b>Due Date:</b> {{ sale_instance.due_date|date:"d/m/Y" }}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Customer Info -->
+    <table>
+        <tr>
+            <td style="text-align:left;"><b>Customer Name :</b> {{ sale_instance.customer.company_name|default:sale_instance.customer.name }}</td>
+            <td style="text-align:left;"><b>Mobile No :</b> {{ sale_instance.customer.contact }}</td>
+        </tr>
+    </table>
+
+    <!-- Product Table -->
+    <table border="1" cellspacing="0" cellpadding="4" width="100%">
+        <thead>
+            <tr>
+                <th>S.No.</th>
+                <th>Product / Service</th>
+                <th>HSN / SAC</th>
+                <th>MRP</th>
+                <th>Dis</th>
+                <th>Qty</th>
+                <th>Taxable Value</th>
+                <th colspan="2">IGST</th>
+                <th>Total</th>
+            </tr>
+            <tr>
+                <th></th><th></th><th></th><th></th><th></th><th></th>
+                <th></th><th>%</th><th>Amt</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in sale_instance.items.all %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.product.hsn|default:"N/A" }}</td>
+                <td>{{ item.price|floatformat:2 }}</td>
+                <td>{{ sale_instance.discount_percentage|default:"0" }}%</td>
+                <td>{{ item.quantity }}</td>
+                <!-- uses DB fields you added -->
+                <td>{{ item.amount|floatformat:2 }}</td>
+                <td>{{ item.product.gst|default:"0" }}%</td>
+                <td>{{ item.tax_amount|floatformat:2 }}</td>
+                <td>{{ item.total_with_tax|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">No items found</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="9" style="text-align:right;"><b>Total</b></td>
+                <td>{{ total_amount|floatformat:2 }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Total + QR + Summary -->
+    <table>
+        <tr>
+            <td style="width:40%; text-align:left;"><b>Total value in words :</b> {{ total_in_words }}</td>
+            <td style="width:20%; text-align:center;">
+                {% if sale_instance.company_profile.payment_qr %}
+                    <img src="{{ sale_instance.company_profile.payment_qr.url }}" width="80" height="80"><br>
+                {% else %}
+                    <img src="{% static 'qr.png' %}" width="80" height="80"><br>
+                {% endif %}
+                Pay using UPI
+            </td>
+            <td style="width:40%;">
+                <table class="summary" style="width:100%;">
+                    <tr><td>Taxable Amount: ₹ {{ sum_taxable|floatformat:2 }}</td></tr>
+                    <tr><td>Total IGST: ₹ {{ sum_igst|floatformat:2 }}</td></tr>
+                    <tr><td>Discount ({{ discount_percentage|default:"0" }}%) : ₹ {{ discount_amount|floatformat:2 }}</td></tr>
+                    <tr><td>Round off: ₹ {{ round_off_value|floatformat:2 }}</td></tr>
+                    <tr class="bold"><td>Total Amount: ₹ {{ rounded_total|floatformat:2 }}</td></tr>
+                    <tr><td>Paid: ₹ {{ paid_amount|floatformat:2 }}</td></tr>
+                    <tr class="bold"><td style="color:red;">Balance: ₹ {{ balance_amount|floatformat:2 }}</td></tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" class="terms"><b>Terms & Conditions</b><br>{{ wholesale.terms|default:"" }}</td>
+            <td style="text-align:right; vertical-align:bottom;">Signature</td>
+        </tr>
+    </table>
+
+</div>
+
+<div class="footer">
+    Website - {{ sale_instance.company_profile.website|default:"www.companydomain.com" }}<br>
+    Page no. 1
+</div>
+
+</body>
+</html>

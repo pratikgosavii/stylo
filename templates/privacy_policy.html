@@ -1,0 +1,98 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Privacy & Policy{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .policy-container {
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        margin-top: 20px;
+        font-size: 14px;
+        color: #000;
+        line-height: 1.6;
+    }
+
+    .policy-container h2 {
+        font-weight: bold;
+        margin-top: 20px;
+        font-size: 16px;
+    }
+
+    .policy-container ul {
+        padding-left: 20px;
+    }
+
+    .policy-container li {
+        margin-bottom: 6px;
+    }
+
+    .highlight {
+        background: yellow;
+        padding: 2px 5px;
+        border-radius: 4px;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">Privacy & Policy</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container">
+                <div class="policy-container">
+                    <h2 class="highlight">Introduction</h2>
+                    <p>We value your privacy and are committed to protecting your personal data. This Privacy Policy outlines how we collect, use, and safeguard your information.</p>
+
+                    <h2 class="highlight">Information We Collect</h2>
+                    <ul>
+                        <li>Personal Information (name, email, address, phone number)</li>
+                        <li>Payment Information</li>
+                        <li>Browsing and Usage Data</li>
+                    </ul>
+
+                    <h2 class="highlight">How We Use Your Information</h2>
+                    <ul>
+                        <li>Process transactions and deliver orders</li>
+                        <li>Improve our services and customer experience</li>
+                        <li>Send promotional offers and updates (with your consent)</li>
+                    </ul>
+
+                    <h2 class="highlight">Data Protection</h2>
+                    <p>We implement security measures to protect your personal information from unauthorized access, alteration, disclosure, or destruction.</p>
+
+                    <h2 class="highlight">Third-Party Disclosure</h2>
+                    <p>We do not sell, trade, or share your personal information with third parties without your consent, except as required by law.</p>
+
+                    <h2 class="highlight">Your Rights</h2>
+                    <p>You have the right to access, update, or delete your personal information. Contact us for any privacy-related concerns.</p>
+
+                    <h2 class="highlight">Changes to This Policy</h2>
+                    <p>We may update this Privacy Policy periodically. We encourage you to review it regularly for any changes.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<!-- Extra JS if needed -->
+{% endblock extra_js %}

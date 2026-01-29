@@ -1,0 +1,1445 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Sales & POS{% endblock %}
+
+{% block extra_css %}
+
+    <link href="{% static 'libs/select2/dist/css/select2.min.css'%}" rel="stylesheet" type="text/css" />
+ <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f0d28c;
+            padding-bottom: 20px;
+        }
+        .form-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .form-heading {
+            text-align: left;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 2rem;
+            color: #ffdb8a;
+        }
+        .btn-primary {
+            background-color: #775599;
+            border-color: #775599;
+        }
+        .custom-button {
+            width: 150px;
+        }
+    </style>
+
+     <style>
+    /* Custom Toggle Switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: orange;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(22px);
+    }
+</style>
+
+
+<style>
+  .remove-btn { cursor: pointer; color: red; font-size: 1.2rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+
+<div class="main-content">
+  <div class="page-content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+            <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                <h4 class="mb-sm-0 font-size-18">Sales & POS</h4>
+            </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="form-container">
+          <form method="post" action="" id="pos-form" >
+            {% csrf_token %}
+            
+            <!-- Billing -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Billing</label>
+                {{ form.company_profile }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Customer</label>
+                <div class="d-flex gap-2 align-items-end">
+                  <div class="flex-grow-1">
+                    {{ form.customer }}
+                  </div>
+                  <div>
+                    <button type="button" class="btn btn-primary px-3" data-bs-toggle="modal" data-bs-target="#customerModal">
+                      <i class="mdi mdi-plus"></i>  Customer
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+                  
+            </div>
+          
+
+            <hr>
+
+            <!-- Barcode Scanner -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Scan Barcode</label>
+              <input type="text" id="barcode-input" class="form-control form-control-lg" placeholder="Scan barcode here..." autocomplete="off">
+              <div class="form-text">Scan the barcode using a scanner or mobile device.</div>
+            </div>
+
+            <!-- Add Product Button -->
+
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+              <div>
+                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#productSearchModal">
+                  <i class="mdi mdi-magnify"></i> Search &amp; Add Product
+                </button>
+
+                <a href="{% url 'add_product' %}"  <button type="button" class="btn btn-primary" >
+                  <i class="mdi mdi-plus-circle-outline"></i> Add Product
+                </button> </a>
+
+              </div>
+
+              <div>
+                <label class="switch mb-0">
+                  <input type="checkbox" name="wholesale_selector" id="wholesale_selector">
+                  <span class="slider round"></span>
+                </label>
+              <label class="" style="font-weight: bold;">Wholesale</label>
+
+              </div>
+            </div>
+
+
+            <!-- Items Table -->
+            <div id="items-container">
+              {% for item in existing_items %}
+              <div class="row g-2 align-items-center mb-2 item-row" data-item-id="{{ item.id }}">
+                <input type="hidden" name="existing_item_ids[]" value="{{ item.id }}">
+                
+                <div class="col-md-4">
+                  <select name="product[]" class="form-select product-select">
+                    <option value="">Select product</option>
+                    {% for p in products %}
+                      <option value="{{ p.id }}" {% if p.id == item.product.id %}selected{% endif %}>
+                        {{ p.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control qty-input" name="quantity[]" value="{{ item.quantity }}" placeholder="Qty" min="1">
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control rate-input" name="price[]" value="{{ item.price }}" placeholder="Price" step="0.01" min="0">
+                </div>
+                <div class="col-md-2">
+                  <input type="text" class="form-control amount" name="amount[]" value="{{ item.amount }}" readonly placeholder="Amount">
+                </div>
+                <div class="col-md-2 text-center">
+                  <span class="remove-btn" style="cursor:pointer;color:red;font-weight:bold;">&times;</span>
+                </div>
+              </div>
+              {% endfor %}
+
+
+              <!-- Optionally, one empty blank row for adding new item -->
+              <div class="row g-2 align-items-center mb-2 item-row">
+                <div class="col-md-4">
+                  <select name="product[]" class="form-select product-select">
+                    <option value="">Select product</option>
+                    {% for p in products %}
+                      <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control qty-input" name="quantity[]" placeholder="Qty" min="1">
+                </div>
+                <div class="col-md-2">
+                  <input type="number" class="form-control rate-input" name="price[]" placeholder="Price" step="0.01" min="0">
+                </div>
+                <div class="col-md-2">
+                  <input type="text" class="form-control amount" name="amount[]" readonly placeholder="Amount">
+                </div>
+                <div class="col-md-2 text-center">
+                  <span class="remove-btn" style="cursor:pointer;color:red;font-weight:bold;">&times;</span>
+                </div>
+              </div>
+            </div>
+
+
+            <div class="text-end my-2">
+              <button type="button" class="btn btn-primary" id="add-item">
+                <i class="mdi mdi-plus-circle-outline"></i> Add Item
+              </button>
+            </div>
+
+            <hr>
+
+            <!-- Payment -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Payment Mode</label>
+                <div class="btn-group" role="group" aria-label="Payment method">
+                  <button type="button" class="btn btn-warning" onclick="selectPayment('cash', this)">Cash</button>
+                  <button type="button" class="btn btn-outline-dark" onclick="selectPayment('upi', this)">UPI</button>
+                  <button type="button" class="btn btn-outline-dark" onclick="selectPayment('card', this)">Card</button>
+                  <button type="button" class="btn btn-outline-dark" onclick="selectPayment('credit', this)">Credit</button>
+                </div>
+
+                <input type="hidden" name="payment_method" id="payment_method" value="cash" required>
+            </div>
+
+
+
+            <!-- Discount & Credit Time -->
+              <div class="row mb-3">
+                <div class="col-md-4">
+                  <label class="form-label mt-2">Discount (₹)</label>
+                  {{ form.discount_amount }}
+
+                  <label class="form-label">Discount (%)</label>
+                                {{ form.discount_percentage }}
+
+                </div>
+                </div>
+              <div id="credit_time" style="display: none;">
+
+                <div class="mb-4"><label class="form-label mt-3">Advance Amount</label>
+                  {{ form.advance_payment_amount }}
+                  <label class="form-label fw-semibold">Advance Payment Mode</label>
+                  <div class="btn-group" role="group" aria-label="Advance Payment Method">
+                      <button type="button" class="btn btn-warning" onclick="selectAdvancePayment('cash', this)">Cash</button>
+                      <button type="button" class="btn btn-outline-dark" onclick="selectAdvancePayment('bank', this)">Bank</button>
+                  </div>
+                  <input type="hidden" name="advance_payment_method" id="advance_payment_method" value="cash" required>
+
+                  <!-- Bank dropdown (hidden by default) -->
+
+                  <!-- Advance Amount -->
+                  
+                </div>
+
+
+                <div class="col-md-4" >
+                  <label class="form-label">Credit Time (days)</label>
+                  {{ form.due_date }}
+                </div>  
+              </div>
+
+              <div id="advance-bank-dropdown" class="mt-2" style="display: none;">
+                <select name="advance_bank" id="advance_bank" class="form-select" onchange="recalculateTotals()">
+                    <option value="">Select Bank</option>
+                    {% for bank in banks %}
+                        <option value="{{ bank.id }}" {% if form.instance.advance_bank and form.instance.advance_bank.id == bank.id %}selected{% endif %}>
+                            {{ bank.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+              </div>
+
+
+            </div>
+
+
+            <!-- Summary -->
+            <div class="border rounded p-3 bg-white shadow-sm mb-4">
+              <h5 class="fw-bold mb-3">Summary</h5>
+              <p>Total Items: <span id="total-items">0</span></p>
+              <p>Total Amount before Discount: ₹<span id="total-amount-before-discount">0.00</span></p>
+              <p>Discount: ₹<span id="discount-amount">0.00</span></p>
+              <p>Total Amount: ₹<span id="total-amount">0.00</span></p>
+
+              <hr>
+
+              <div id="advance_summary" style="display:none">
+                <p>Advance Payment: ₹<span id="advance-amount">0.00</span></p>
+                <p>Advance Mode: <span id="advance-mode">Cash</span> 
+                    <span id="advance-bank-name" style="display:none;">(Bank Name)</span>
+                </p>
+              </div>
+
+              <p><strong>Net Payable: ₹<span id="net-payable">0.00</span></strong></p>
+              
+            </div>
+
+            
+          <hr>
+
+            <div id="secondform" style="display:none;">
+
+              <!-- Document Type Selection -->
+              <div class="mb-3">
+                <div class="btn-group" role="group" aria-label="Document Type">
+
+                  <input type="hidden" name="invoice_type" id="invoice_type_input" value="{{ form.invoice_type.value|default:'invoice' }}">
+
+                  <button type="button" class="btn btn-outline-secondary" data-type="invoice">Invoice</button>
+                  <button type="button" class="btn btn-outline-secondary" data-type="proforma">Pro Forma Invoice</button>
+                  <button type="button" class="btn btn-outline-secondary" data-type="quotation">Quotation</button>
+                  <button type="button" class="btn btn-outline-secondary" data-type="credit_note">Credit Note</button>
+                  <button type="button" class="btn btn-outline-secondary" data-type="delivery_challan">Delivery Challan</button>
+                </div>
+
+              </div>
+
+              
+
+              <!-- Invoice Number and Date -->
+              <div class="card mb-3 bg-light border-0">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong id="purchase_code_display"></strong>
+                    <input type="hidden" name="invoice_number" id="invoice_number">
+                    <input type="text" name="purchase_code" id="purchase_code_input"
+                          value="{{ wholesale_forms.purchase_code.value }}" class="form-control form-control-sm d-none"
+                          style="width: 150px;" />
+                    {% if wholesale_forms.purchase_code.errors %}
+                    <div class="text-danger mt-1 small">{{ wholesale_forms.purchase_code.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+                  <div>{{ wholesale_forms.purchase_date }}</div>
+                  {% comment %} <button id="edit_btn" type="button" class="btn btn-sm btn-outline-primary">Edit</button> {% endcomment %}
+                </div>
+              </div>
+
+              <!-- Optional Fields -->
+              <div class="card bg-light border-0 mb-3">
+                <div class="card-header bg-transparent fw-bold">Optional</div>
+                <div class="card-body p-2">
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-truck"></i> Dispatch Address</label>
+                    {{ wholesale_forms.dispatch_address }}
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-archive"></i> Add References</label>
+                    {{ wholesale_forms.references }}
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-chat-dots"></i> Add Notes</label>
+                    {{ wholesale_forms.notes }}
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-clipboard-text"></i> Add Terms</label>
+                    {{ wholesale_forms.terms }}
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-truck-flatbed"></i> Delivery/Shipping Charges</label>
+                    {{ wholesale_forms.delivery_charges }}
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-box-seam"></i> Packaging Charges</label>
+                    {{ wholesale_forms.packaging_charges }}
+                  </div>
+
+                  
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-geo-alt"></i> Delivery City</label>
+                    {{ wholesale_forms.delivery_city }}
+
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-arrow-left-right"></i> Reverse Charge</label>
+                    {{ wholesale_forms.reverse_charges }}
+
+                  </div>
+
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-file-earmark-bar-graph"></i> E-way Bill Number</label>
+                    {{ wholesale_forms.eway_bill_number }}
+                  
+                  </div>
+
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-card-list"></i> LR Number</label>
+                    {{ wholesale_forms.lr_number }}
+                  </div>
+
+                  
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-truck-front"></i> Vehicle Number</label>
+                    <input id="vehicle_number" name="vehicle_number" type="text" class="form-control">
+                  </div>
+
+
+                
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-building"></i> Transport Name</label>
+                    {{ wholesale_forms.transport_name }}
+
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="form-label"><i class="bi bi-boxes"></i> No. of Parcels</label>
+                    <input id="number_of_parcels" name="number_of_parcels" type="text" class="form-control">
+                  </div>
+
+
+                
+                </div>
+              </div>
+            </div>
+
+
+            <div class="text-end">
+              <button type="submit" class="btn btn-success btn-lg">Checkout</button>
+              <button type="reset" class="btn btn-danger btn-lg">Discard</button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Product Search Modal -->
+<div class="modal fade" id="productSearchModal" tabindex="-1" aria-labelledby="productSearchModalLabel">
+
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productSearchModalLabel">Search & Select Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="form-control mb-4" id="product-search-input" placeholder="Search by name...">
+        <div class="row" id="product-list">
+          {% for product in products %}
+          <div class="col-lg-2 col-md-3 col-sm-4 mb-3">
+
+              {% if product.image %}
+              <div class="card h-100 shadow-sm product-card" 
+                  data-id="{{ product.id }}"
+                  data-name="{{ product.name }}"
+                  data-price="{{ product.sales_price }}"
+                  data-image="{{ product.image.url }}">
+                <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+            {% else %}
+              <div class="card h-100 shadow-sm product-card" 
+                  data-id="{{ product.id }}"
+                  data-name="{{ product.name }}"
+                  data-price="{{ product.sales_price }}"
+                  data-image="">
+                <img src="{% static 'images/default-product.png' %}" class="card-img-top" alt="No Image">
+            {% endif %}
+
+
+              <div class="card-body text-center">
+                <h6 class="card-title">{{ product.name }}</h6>
+                <p>₹{{ product.sales_price }}</p>
+                <div class="input-group mb-2 justify-content-center">
+                  <button class="btn btn-outline-secondary" onclick="adjustQty('{{ product.id }}', -1)">-</button>
+                  <input type="text" class="form-control text-center" value="0" id="qty-{{ product.id }}" readonly>
+                  <button class="btn btn-outline-secondary" onclick="adjustQty('{{ product.id }}', 1)">+</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="addToPOS({{ product.id }}, '{{ product.name }}', {{ product.sales_price }}, 'qty-{{ product.id }}')">Add to POS</button>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+                                     
+                                        
+                                    
+        <div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="exampleModalLabel">Add Customer</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="modal-content" id="customerModalContent">
+                <form id="customerForm" method="post">
+                  {% csrf_token %}
+                  <div class="modal-body">
+                    {% for field in customer_forms %}
+                      <div class="mb-3">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                          <div class="text-danger">{{ field.errors }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                
+
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                  </div>
+
+
+                </form>
+
+            </div>
+          </div>
+            
+        </div>
+      </div>
+                    
+
+{% endblock content %}
+
+{% block extra_js %}
+
+
+<script>
+  $(document).ready(function () {
+    // Load modal content dynamically if needed
+    $('[data-bs-target="#customerModal"]').on('click', function () {
+      $.get("{% url 'add_customer_modal' %}", function (html) {
+        $('#customerModalContent').html(html);
+      });
+    });
+
+    // Properly handle customer form submission
+    $(document).on('submit', '#customerForm', function (e) {
+      e.preventDefault();  // ✅ prevent full form submission
+      const form = this;
+      const formData = new FormData(form);
+
+      $.ajax({
+        url: "{% url 'add_customer_modal' %}",
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+       success: function (data) {
+  if (data.success) {
+    alert("Customer added: " + data.name);
+
+    // 👇 Add new option to dropdown and select it
+    $('#id_customer').append(
+      $('<option>', {
+        value: data.id,  // make sure your view returns the ID
+        text: data.name,
+        selected: true
+      })
+    );
+
+    // 👇 Hide the modal
+    bootstrap.Modal.getInstance(document.getElementById('customerModal')).hide();
+  } else {
+    $('#customerModalContent').html(data.html);
+  }
+}
+
+      });
+    });
+  });
+</script>
+
+<script>
+  // Helper: recalculate one row
+  function recalcRow(row) {
+    const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+    const price = parseFloat(row.querySelector('.rate-input').value) || 0;
+    row.querySelector('.amount').value = (qty * price).toFixed(2);
+  }
+
+  // Recalculate totals
+  // Recalculate totals
+function recalculateTotals() {
+    let totalItems = 0;
+    let totalAmount = 0;
+
+    document.querySelectorAll('.item-row').forEach(row => {
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.rate-input').value) || 0;
+        const amount = qty * price;
+
+        row.querySelector('.amount').value = amount.toFixed(2);
+        totalItems += qty;
+        totalAmount += amount;
+    });
+
+    const discountPercentageField = document.getElementById('discount-percentage');
+    const discountAmountField = document.getElementById('discount-amount-input');
+    const advanceAmountField = document.getElementById('id_advance_payment_amount');
+
+    let discountAmount = 0;
+    let discountPercentage = 0;
+
+    // Two-way discount binding
+    if (document.activeElement === discountPercentageField) {
+        discountPercentage = parseFloat(discountPercentageField.value) || 0;
+        discountAmount = totalAmount * (discountPercentage / 100);
+        discountAmountField.value = discountAmount.toFixed(2);
+    } else if (document.activeElement === discountAmountField) {
+        discountAmount = parseFloat(discountAmountField.value) || 0;
+        discountPercentage = (totalAmount === 0) ? 0 : (discountAmount / totalAmount) * 100;
+        discountPercentageField.value = discountPercentage.toFixed(2);
+    } else {
+        discountPercentage = parseFloat(discountPercentageField.value) || 0;
+        discountAmount = totalAmount * (discountPercentage / 100);
+        discountAmountField.value = discountAmount.toFixed(2);
+    }
+
+    const amountAfterDiscount = totalAmount - discountAmount;
+    const advanceAmount = parseFloat(advanceAmountField.value) || 0;
+    const netPayable = amountAfterDiscount - advanceAmount;
+
+    // Update summary
+    document.getElementById('total-items').innerText = totalItems;
+    document.getElementById('total-amount-before-discount').innerText = totalAmount.toFixed(2);
+    document.getElementById('discount-amount').innerText = discountAmount.toFixed(2);
+    document.getElementById('total-amount').innerText = amountAfterDiscount.toFixed(2);
+
+    // New: update advance and net payable
+    document.getElementById('advance-amount').innerText = advanceAmount.toFixed(2);
+
+    const mode = document.getElementById('advance_payment_method').value;
+    document.getElementById('advance-mode').innerText = mode.charAt(0).toUpperCase() + mode.slice(1);
+
+    const bankSelect = document.getElementById('advance_bank');
+    if (mode === 'bank' && bankSelect && bankSelect.value) {
+        document.getElementById('advance-bank-name').style.display = 'inline';
+        document.getElementById('advance-bank-name').innerText = `(${bankSelect.options[bankSelect.selectedIndex].text})`;
+    } else {
+        document.getElementById('advance-bank-name').style.display = 'none';
+    }
+
+    document.getElementById('net-payable').innerText = netPayable.toFixed(2);
+}
+
+
+
+  document.getElementById('discount-percentage').addEventListener('input', recalculateTotals);
+  document.getElementById('discount-amount-input').addEventListener('input', recalculateTotals);
+  document.getElementById('id_advance_payment_amount').addEventListener('input', recalculateTotals);
+  
+  
+  
+  function getUsedProducts() {
+    const used = [];
+    document.querySelectorAll(".product-select").forEach((sel) => {
+      if (sel.value) used.push(sel.value);
+    });
+    return used;
+  }
+
+      
+  // Unique ID adjusters
+  function adjustQty(pid, change) {
+    const el = document.getElementById(`qty-${pid}`);
+    let v = parseInt(el.value) || 0;
+    v = Math.max(1, v + change);
+    el.value = v;
+  }
+
+     function updateSelectOptions() {
+        console.log('sdsdsd')
+        const used = getUsedProducts();
+        document.querySelectorAll(".product-select").forEach((select) => {
+          const current = select.value;
+          select.querySelectorAll("option").forEach((option) => {
+            option.disabled =
+              used.includes(option.value) && option.value !== current;
+          });
+        });
+      }
+
+
+  // Add selected product to POS
+  function addToPOS(pid, name, price, qtyId) {
+  const qty = parseInt(document.getElementById(qtyId).value) || 1;
+
+  let rowFound = Array.from(document.querySelectorAll('.item-row')).find(row => {
+    return row.querySelector('.product-select').value == pid;
+  });
+
+  if (!rowFound) {
+    document.getElementById('add-item').click();
+    rowFound = document.querySelector('.item-row:last-child');
+
+    // Reinitialize Select2 on this new row AFTER it is added
+    initializeSelect2OnRow(rowFound);
+  }
+
+  // Set values
+  const select = rowFound.querySelector('.product-select');
+  select.value = pid;
+
+  // Manually trigger Select2 change event so it updates the UI
+  $(select).trigger('change');
+
+  rowFound.querySelector('.qty-input').value = qty;
+  rowFound.querySelector('.rate-input').value = price.toFixed(2);
+
+  recalcRow(rowFound);
+  recalculateTotals();
+  updateSelectOptions();
+
+  setTimeout(() => {
+    // Remove focus from any element inside the modal
+    document.activeElement.blur();
+
+    const modalEl = document.getElementById('productSearchModal');
+    bootstrap.Modal.getInstance(modalEl).hide();
+  }, 50);
+}
+  function addToPOS_barcode(pid, name, price, qtyToAdd = 1) {
+  // Find existing row with this product
+  let rowFound = Array.from(document.querySelectorAll('.item-row')).find(row => {
+    return row.querySelector('.product-select').value == pid;
+  });
+
+  if (rowFound) {
+    // Product already in POS: increment quantity
+    const qtyInput = rowFound.querySelector('.qty-input');
+    const currentQty = parseInt(qtyInput.value) || 0;
+    qtyInput.value = currentQty + qtyToAdd;
+
+    // Recalculate row and totals
+    recalcRow(rowFound);
+    recalculateTotals();
+    updateSelectOptions();
+
+    // Trigger Select2 update to keep UI consistent
+    const select = rowFound.querySelector('.product-select');
+    $(select).trigger('change');
+
+  } else {
+    // Not found: add new row
+    document.getElementById('add-item').click();
+    rowFound = document.querySelector('.item-row:last-child');
+
+    initializeSelect2OnRow(rowFound);
+
+    // Set select value & quantity
+    const select = rowFound.querySelector('.product-select');
+    select.value = pid;
+    $(select).trigger('change');
+
+    rowFound.querySelector('.qty-input').value = qtyToAdd;
+    rowFound.querySelector('.rate-input').value = price.toFixed(2);
+
+    recalcRow(rowFound);
+    recalculateTotals();
+    updateSelectOptions();
+  }
+
+  setTimeout(() => {
+    // Remove focus from any element inside the modal
+    document.activeElement.blur();
+  }, 50);
+}
+
+
+
+    function recalculateAmount(row) {
+        const qty = parseInt(row.querySelector(".qty-input").value) || 0;
+        const rate = parseFloat(row.querySelector(".rate-input").value) || 0;
+        row.querySelector(".amount").value = (qty * rate).toFixed(2);
+      }
+
+
+      $(document).on('change', '.product-select', function () {
+    var productId = $(this).val();
+    var row = $(this).closest('.row');
+    if (productId) {
+        $.ajax({
+            url: "{% url 'get_product_price' %}",
+            data: { product_id: productId },
+            success: function (data) {
+                row.find('.rate-input').val(data.price);  // ✅ Sets the price here
+                let qty = parseFloat(row.find('.quantity').val()) || 0;
+                row.find('.amount').val((qty * parseFloat(data.price)).toFixed(2));
+                $('#total-items').text(document.querySelectorAll('.item-row').length);
+                recalculateTotals();
+            }
+        });
+    }
+});
+
+
+
+  // Add item row
+  function initializeSelect2OnRow(row) {
+  const select = row.querySelector('.product-select');
+
+  // Clean up previous Select2 if exists
+  if ($(select).hasClass("select2-hidden-accessible")) {
+    $(select).select2('destroy');
+  }
+
+  
+
+  // Reinitialize
+  $(select).select2({
+    placeholder: "Select product",
+    width: '100%'
+  });
+}
+
+// Initial setup for first row
+document.addEventListener('DOMContentLoaded', function () {
+  const rows = document.querySelectorAll('.item-row');
+  rows.forEach(initializeSelect2OnRow);
+});
+
+document.getElementById('add-item').addEventListener('click', () => {
+  const orig = document.querySelector('.item-row');
+  
+  // Remove Select2 before cloning
+  const origSelect = orig.querySelector('.product-select');
+  if ($(origSelect).hasClass("select2-hidden-accessible")) {
+    $(origSelect).select2('destroy');
+  }
+
+  // Clone the raw HTML
+  const clone = orig.cloneNode(true);
+
+  // Reset values in inputs
+  clone.querySelectorAll('input').forEach(i => {
+    if (i.classList.contains('rate-input') || i.classList.contains('amount')) {
+      i.value = '0.00';
+    } else {
+      i.value = '';
+    }
+  });
+
+  // Append new row
+  document.getElementById('items-container').appendChild(clone);
+
+  // Reinitialize Select2 on both original and clone
+  initializeSelect2OnRow(orig);
+  initializeSelect2OnRow(clone);
+
+  // Reattach other listeners if needed
+  attachListeners(clone);
+  attachRemoveListener(clone);
+
+});
+
+document.querySelectorAll(".item-row").forEach(row => {
+    attachListeners(row);
+    attachRemoveListener(row);
+});
+
+
+  // Attach row listeners
+  function attachListeners(row) {
+    const qtyInput = row.querySelector(".qty-input");
+  const select = row.querySelector(".product-select");
+  const rateInput = row.querySelector(".rate-input");
+
+  qtyInput.addEventListener("input", () => {
+
+
+    const id = "qty-" + select.value;
+    const dynamicQtyInput = document.getElementById(id);
+    if (dynamicQtyInput) {
+      dynamicQtyInput.value = qtyInput.value;
+    }
+    recalculateTotals();
+  });
+
+  function attachListeners(row) {
+    const qtyInput = row.querySelector(".qty-input");
+    const select = row.querySelector(".product-select");
+    const rateInput = row.querySelector(".rate-input");
+
+    if (!qtyInput || !select || !rateInput) return;
+
+    qtyInput.addEventListener("input", () => {
+        const id = "qty-" + select.value;
+        const dynamicQtyInput = document.getElementById(id);
+        if (dynamicQtyInput) {
+            dynamicQtyInput.value = qtyInput.value;
+        }
+        recalculateTotals();
+    });
+
+    select.addEventListener("change", () => {
+        const selected = select.options[select.selectedIndex];
+        const rate = parseFloat(selected.getAttribute("data-rate")) || 0;
+        rateInput.value = rate.toFixed(2);
+        updateSelectOptions();
+        recalculateAmount(row);
+    });
+}
+
+  }
+
+  // Payment method selector
+  // Payment method selector
+function selectPayment(method, btn) {
+  // set value
+  document.getElementById('payment_method').value = method;
+
+  // reset button styles
+  document.querySelectorAll('.btn-group .btn').forEach(b => 
+    b.classList.replace('btn-warning', 'btn-outline-dark')
+  );
+  btn.classList.replace('btn-outline-dark', 'btn-warning');
+
+  // toggle credit time section
+  document.getElementById('credit_time').style.display = method === 'credit' ? 'block' : 'none';
+
+  // toggle bank dropdown
+  const bankDropdown = document.getElementById('advance-bank-dropdown');
+  const bankSelect = document.getElementById('advance_bank');
+
+  if (method !== 'cash') {
+    bankDropdown.style.display = 'block';
+    bankSelect.setAttribute('required', 'required');
+  } else {
+    bankDropdown.style.display = 'none';
+    bankSelect.removeAttribute('required');
+    bankSelect.value = ""; // reset when hidden
+  }
+
+  // if credit is selected, reset advance payment mode to cash
+  if (method === 'credit') {
+    document.getElementById('advance_summary').style.display = "block";
+    const advanceCashBtn = document.querySelector(
+      "[onclick*=\"selectAdvancePayment('cash'\"]"
+    );
+    if (advanceCashBtn) {
+      advanceCashBtn.click(); // trigger JS + UI update
+    }
+  }else{
+    document.getElementById('advance_summary').style.display = "none";
+
+  }
+}
+
+
+  //advance choice
+
+function selectAdvancePayment(method, btn) {
+    // Update hidden field
+    document.getElementById('advance_payment_method').value = method;
+
+    // Toggle active button styling
+    btn.closest('.btn-group').querySelectorAll('button').forEach(b => {
+        b.classList.remove('btn-warning');
+        b.classList.add('btn-outline-dark');
+    });
+    btn.classList.remove('btn-outline-dark');
+    btn.classList.add('btn-warning');
+
+    // Show/hide bank dropdown
+    if (method === 'bank') {
+        document.getElementById('advance-bank-dropdown').style.display = 'block';
+        
+    } else {
+        document.getElementById('advance-bank-dropdown').style.display = 'none';
+        document.getElementById('advance_bank').value = ''; // clear bank
+    }
+
+      recalculateTotals();
+
+}
+
+// Auto-run on page load to reflect existing value (for edit)
+document.addEventListener('DOMContentLoaded', function() {
+    const method = document.getElementById('advance_payment_method').value;
+    const btn = document.querySelector(`[onclick="selectAdvancePayment('${method}', this)"]`);
+    if (btn) selectAdvancePayment(method, btn);
+});
+
+
+  // Search filter
+  document.getElementById('product-search-input').addEventListener('input', function(){
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#product-list .product-card').forEach(card => {
+      card.style.display = card.dataset.name.toLowerCase().includes(q) ? 'block' : 'none';
+    });
+  });
+
+  // Initial setup
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.item-row').forEach(attachListeners);
+    document.getElementById('items-container').addEventListener('input', recalculateTotals);
+    document.getElementById('discount-percentage').addEventListener('input', recalculateTotals);
+    document.getElementById('discount-amount-input').addEventListener('input', recalculateTotals);
+  });
+
+
+  // Attach row removal listener
+function attachRemoveListener(row) {
+    const removeBtn = row.querySelector(".remove-btn");
+    if (!removeBtn) return;
+
+    removeBtn.addEventListener("click", () => {
+        const allRows = document.querySelectorAll(".item-row");
+        const itemId = row.getAttribute("data-item-id");
+
+        if (itemId) {
+            // Mark this item for deletion
+            const deleteInput = document.createElement("input");
+            deleteInput.type = "hidden";
+            deleteInput.name = "delete_item_ids[]";
+            deleteInput.value = itemId;
+            document.querySelector("form").appendChild(deleteInput);
+        }
+
+        // Remove row visually
+        if (allRows.length > 1) {
+            row.remove();
+            recalculateTotals();
+        } else {
+            alert("At least one row is required.");
+        }
+    });
+}
+
+
+
+
+
+
+  // Barcode input handler
+document.getElementById('barcode-input').addEventListener('change', function () {
+  const barcode = this.value.trim();
+  if (!barcode) return;
+
+  $.ajax({
+    url: "{% url 'barcode_lookup' %}",  // 🔁 Your backend view must return product details
+    method: "GET",
+    data: { barcode },
+    success: function (data) {
+      if (data.success) {
+        console.log(data.id, data.name, parseFloat(data.price), 1)
+        addToPOS_barcode(data.id, data.name, parseFloat(data.price), 1);
+        document.getElementById('barcode-input').value = '';
+      } else {
+        alert("Product not found!");
+      }
+    },
+    error: function () {
+      alert("Error looking up product!");
+    }
+  });
+});
+
+// product search
+// Function to apply Select2 to all product dropdowns
+function applySelect2ToProducts() {
+  $('.product-select').select2({
+    width: '100%',
+    placeholder: 'Select product',
+    allowClear: true
+  });
+}
+
+// Initial call on document ready
+
+$(document).ready(function () {
+  applySelect2ToProducts();
+
+  // If you have "Add Item" button functionality that clones a row, re-apply Select2
+  $(document).on('click', '#add-item-btn', function () {
+    let newItem = $('.item-row').first().clone();
+    newItem.find('input').val('');  // clear values
+    $('#items-container').append(newItem);
+
+    // Reinitialize select2 for the new dropdown
+    newItem.find('.product-select select2').select2({
+      width: '100%',
+      placeholder: 'Select product',
+      allowClear: true
+    });
+  });
+});
+
+
+
+
+
+</script>
+
+
+
+    <script>
+
+        
+function displaySelectedImages() {
+    const input = document.getElementById("images");
+    const selectedImagesContainer = document.getElementById("imagesPreview");
+    selectedImagesContainer.innerHTML = ""; // Clear previously displayed images
+
+    Array.from(input.files).forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageDiv = document.createElement("div");
+          imageDiv.style.position = "relative";
+          const img = document.createElement("img");
+          img.src = event.target.result;
+          img.alt = file.name;
+          img.style.width = "100px";
+          img.style.height = "100px";
+          img.style.objectFit = "cover";
+          img.style.border = "1px solid #ddd";
+          img.style.borderRadius = "5px";
+          imageDiv.appendChild(img);
+          selectedImagesContainer.appendChild(imageDiv);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+
+
+  
+
+    </script>
+
+    <script>
+        {% comment %} const editBtn = document.getElementById('edit_btn');
+        const codeDisplay = document.getElementById('purchase_code_display');
+        const codeInput = document.getElementById('purchase_code_input');
+      
+        editBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (codeInput.classList.contains('d-none')) {
+            // Show input, hide static text
+            codeInput.classList.remove('d-none');
+            codeDisplay.style.display = 'none';
+            codeInput.focus();
+            editBtn.textContent = 'Save';
+          } else {
+            // Hide input, show static text, update static text with input value
+            const newCode = codeInput.value.trim();
+            if(newCode) {
+              codeDisplay.textContent = newCode;
+            }
+            codeInput.classList.add('d-none');
+            codeDisplay.style.display = '';
+            editBtn.textContent = 'Edit';
+          }
+        }); {% endcomment %}
+
+
+       
+
+
+
+  {% comment %} // Toggle edit/save for purchase code
+document.addEventListener('DOMContentLoaded', function () {
+  const editBtn = document.getElementById('edit_btn');
+  const codeDisplay = document.getElementById('purchase_code_display');
+  const codeInput = document.getElementById('purchase_code_input');
+
+  editBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (codeInput.classList.contains('d-none')) {
+      codeInput.classList.remove('d-none');
+      codeDisplay.style.display = 'none';
+      codeInput.focus();
+      editBtn.textContent = 'Save';
+    } else {
+      const newCode = codeInput.value.trim();
+      if (newCode) codeDisplay.textContent = newCode;
+      codeInput.classList.add('d-none');
+      codeDisplay.style.display = '';
+      editBtn.textContent = 'Edit';
+    }
+  });
+}); {% endcomment %}
+
+
+
+
+  
+      </script>
+
+      <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const invoiceButtons = document.querySelectorAll('[data-type]');
+    const hiddenInput = document.getElementById('invoice_type_input');
+
+    function updateButtonStyles(selectedType) {
+      invoiceButtons.forEach(btn => {
+        if (btn.dataset.type === selectedType) {
+          btn.classList.remove('btn-outline-secondary');
+          btn.classList.add('btn-warning', 'text-white');
+        } else {
+          btn.classList.remove('btn-warning', 'text-white');
+          btn.classList.add('btn-outline-secondary');
+        }
+      });
+    }
+
+    invoiceButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const selectedType = button.dataset.type;
+        hiddenInput.value = selectedType;
+        updateButtonStyles(selectedType);
+      });
+    });
+
+    // Initialize active state on page load
+    updateButtonStyles(hiddenInput.value || 'invoice');
+  });
+</script>
+
+
+<script>
+  const fieldRules = {
+    invoice: {
+      id_eway_bill_number: true,
+      vehicle_number: true,
+      number_of_parcels: true,
+      transport_name: true,
+      delivery_city: true,
+      id_reverse_charge: true,
+    },
+    proforma: {
+      id_eway_bill_number: false,
+      vehicle_number: false,
+      number_of_parcels: false,
+      transport_name: false,
+      delivery_city: true,
+      id_reverse_charge: true,
+    },
+    quotation: {
+      id_eway_bill_number: false,
+      vehicle_number: false,
+      number_of_parcels: false,
+      transport_name: false,
+      delivery_city: false,
+      id_reverse_charge: false,
+    },
+    credit_note: {
+      id_eway_bill_number: false,
+      vehicle_number: false,
+      number_of_parcels: false,
+      transport_name: false,
+      delivery_city: false,
+      id_reverse_charge: false,
+    },
+    delivery_challan: {
+      id_eway_bill_number: true,
+      vehicle_number: true,
+      number_of_parcels: true,
+      id_transport_name: true,
+      id_delivery_city: true,
+      id_reverse_charge: true,
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const invoiceButtons = document.querySelectorAll('[data-type]');
+    const hiddenInput = document.getElementById('invoice_type_input');
+
+    function updateRequiredFields(type) {
+      const rules = fieldRules[type];
+      for (const field in rules) {
+        const el = document.getElementById(field);
+        if (el) {
+          if (rules[field]) {
+            el.setAttribute('required', 'required');
+            el.closest('.mb-2').style.display = '';  // Show field
+          } else {
+            el.removeAttribute('required');
+            el.closest('.mb-2').style.display = '';  // Or hide: style.display = 'none';
+          }
+        }
+      }
+    }
+
+    invoiceButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const selectedType = button.dataset.type;
+        hiddenInput.value = selectedType;
+        updateButtonStyles(selectedType);
+        updateRequiredFields(selectedType);
+      });
+    });
+
+    function updateButtonStyles(selectedType) {
+      invoiceButtons.forEach(btn => {
+        if (btn.dataset.type === selectedType) {
+          btn.classList.remove('btn-outline-secondary');
+          btn.classList.add('btn-warning', 'text-white');
+        } else {
+          btn.classList.remove('btn-warning', 'text-white');
+          btn.classList.add('btn-outline-secondary');
+        }
+      });
+    }
+
+    // Initial load
+    const initialType = hiddenInput.value || 'invoice';
+    updateButtonStyles(initialType);
+    updateRequiredFields(initialType);
+  });
+
+  
+document.addEventListener('DOMContentLoaded', function () {
+  const igstToggle = document.getElementById('wholesale_selector');
+  const wholesaleSection = document.getElementById('secondform');
+  const wholesaleFields = wholesaleSection.querySelectorAll('input, select, textarea');
+
+  // Store original required state on load
+  wholesaleFields.forEach(field => {
+    field.dataset.originalRequired = field.hasAttribute('required') ? "true" : "false";
+  });
+
+  function toggleWholesale() {
+    if (igstToggle.checked) {
+      wholesaleSection.style.display = 'block';
+      // Restore original required fields
+      wholesaleFields.forEach(field => {
+        if (field.dataset.originalRequired === "true") {
+          field.setAttribute('required', 'required');
+        }
+      });
+    } else {
+      // Remove required to prevent validation errors
+      wholesaleFields.forEach(field => {
+        console.log(field)
+        field.removeAttribute('required');
+      });
+      wholesaleSection.style.display = 'none';
+    }
+  }
+
+  // Run once on page load
+  toggleWholesale();
+
+  // Watch for changes
+  igstToggle.addEventListener('change', toggleWholesale);
+});
+
+
+
+</script>
+
+
+
+
+  <script src="{% static 'libs/select2/dist/js/select2.min.js'%}"></script>
+
+    <!-- init js -->
+    <script src="{% static 'js/pages/ecommerce-select2.init.js'%}"></script>
+
+<script>
+
+
+  function fetchInvoiceNumber(invoiceType) {
+  fetch(`/vendor/get_invoice_number/?invoice_type=${invoiceType}`)
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById("purchase_code_display").textContent = data.invoice_number;
+      document.getElementById("invoice_number").value = data.invoice_number;
+    });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const hiddenInput = document.getElementById("invoice_type_input");
+  const buttons = document.querySelectorAll('[data-type]');
+  
+  // Initial fetch based on hidden input's default
+  fetchInvoiceNumber(hiddenInput.value);
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", function () {
+      const type = this.getAttribute("data-type");
+
+      // Update hidden input value
+      hiddenInput.value = type;
+
+      // Highlight selected button
+      buttons.forEach(b => b.classList.remove("btn-warning"));
+      this.classList.add("btn-warning");
+
+      // Fetch updated invoice number
+      fetchInvoiceNumber(type);
+    });
+
+    // Optional: Highlight default selected button on load
+    if (btn.getAttribute("data-type") === hiddenInput.value) {
+      btn.classList.add("btn-warning");
+    }
+  });
+});
+
+
+</script>
+
+
+
+
+{% endblock extra_js %}

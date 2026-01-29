@@ -1,0 +1,1342 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Create Product{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+<style>
+    body {
+        background-color: #f0d28c;
+        padding-bottom: 20px;
+    }
+    .form-container {
+        background-color: #ffffff;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .form-heading {
+        text-align: left;
+        margin-bottom: 20px;
+        font-weight: bold;
+        font-size: 2rem;
+        color: #775599;
+    }
+    .image-preview {
+        max-height: 100px;
+        margin-top: 10px;
+    }
+    .btn-primary {
+        background-color: #775599;
+        border-color: #775599;
+    }
+    .custom-button {
+        width: 150px;
+    }
+
+
+    .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 25px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 25px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 19px;
+    width: 19px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+    background-color: #4caf50;
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(25px);
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  border-radius: 34px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: .4s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 17px;
+  width: 17px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: orange;
+}
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+
+
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">Create Product</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container">
+                <div class="form-container">
+                    <form method="POST" enctype="multipart/form-data" id="product-form">
+                        {% csrf_token %}
+                        
+                        <div style="justify-content: right; display: flex;">
+                        <button type="button" id="use-defaults-btn" class="btn btn-warning">Use Defaults</button>
+                        </div>
+
+                        
+                        <div class="mb-3">
+                            <label for="id_product_type" class="form-label">Product Type</label>
+                            {{ form.product_type }}
+                        </div>
+                    
+                        <div class="mb-3">
+                            <label for="id_sale_type" class="form-label">Sale Type</label>
+                            {{ form.sale_type }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_name" class="form-label">Product Name</label>
+                            {{ form.name }}
+                        </div>
+                    
+                        <div class="mb-3" id="category_wrapper">
+                            <label for="id_category" class="form-label">Category</label>
+                            {{ form.category }}
+                        </div>
+                    
+                        <div class="mb-3" id="sub_category_wrapper">
+                            <label for="id_sub_category" class="form-label">Sub Category</label>
+                            {{ form.sub_category }}
+                        </div>
+
+                    
+                        <div id="foodOptionToggleWrapper" style="display: block;">
+                            <label>Include Food Option?</label><br>
+                            <label class="switch">
+                                {{ form.is_food }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Customize Print Toggle -->
+                        <div id="customizePrintToggleWrapper" style="display: block;">
+                            <label>Customize Print?</label><br>
+                            <label class="switch">
+                                {{ form.is_customize }}
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Food type field wrapper -->
+                        <div id="foodTypeWrapper" style="display: none;">
+
+                            <div class="mb-3">
+                                <label for="id_sub_category" class="form-label">Food Type</label>
+                                {{ form.food_type }}
+                            </div>
+                        </div>
+                    
+                        <div class="mb-3">
+                            <label for="id_description" class="form-label">Description</label>
+                            {{ form.description }}
+                        </div>
+                    
+                        <!-- Pricing -->
+                        <hr>
+                        <div style="display:flex; gap : 10px;" class="product-only-field" id="mrp_section">
+                                
+                            <div class="mb-3 product-only-field">
+                                <label for="id_wholesale_price" class="form-label">Wholesale Price **</label>
+                                {{ form.wholesale_price }}
+                            </div>
+                        
+                            <div class="mb-3 product-only-field">
+                                <label for="id_purchase_price" class="form-label">Purchase Price **</label>
+                                {{ form.purchase_price }}
+                            </div>
+                        
+                            <div class="mb-3 product-only-field">
+                                <label for="id_sales_price" class="form-label">Sales Price</label>
+                                {{ form.sales_price }}
+                            </div>
+                        
+                           
+                        
+                        </div>
+
+                         <div class="mb-3">
+                                <label for="id_mrp" class="form-label">MRP</label>
+                                {{ form.mrp }}
+                            </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_unit" class="form-label">Unit</label>
+                            {{ form.unit }}
+                        </div>
+                       
+                        <div class="product-only-field">
+                            <div class="mb-3">
+                                <label for="id_size" class="form-label product-only-field">Size</label>
+                                {{ form.size }}
+                            </div>
+                        </div>
+                    
+                        <div class="mb-3">
+                            <label for="id_hsn" class="form-label">HSN</label>
+                            {{ form.hsn }}
+                        </div>
+                    
+                        <div class="mb-3">
+                            
+                            <label for="id_tax_inclusive" class="form-label">Tax Inclusive</label>
+                            {{ form.tax_inclusive }}
+                           
+                            <div id="tax_div">
+
+                            <label for="id_gst" class="form-label">GST (%)</label>
+                            {{ form.gst }}
+                            </div>
+
+                            <span style="color:red;">  *  To enable GST details please select as registered business in company settings </span>
+
+                        </div>
+                    
+                        <!-- Stock -->
+                        <hr class="product-only-field">
+
+                            <div class="mb-3 form-check ">
+                                {{ form.track_serial_numbers }}
+                                <label class="form-check-label" for="id_track_serial_numbers">Track Serial Numbers</label>
+                            </div>
+                        
+                            <div class="mb-3">
+                                <label for="id_opening_stock" class="form-label">Opening Stock</label>
+                                {{ form.opening_stock }}
+                            </div>
+                        
+                            <div class="mb-3 form-check ">
+                                {{ form.low_stock_alert }}
+                                <label class="form-check-label" for="id_low_stock_alert">Low Stock Alert</label>
+                            </div>
+                        
+                            <div class="mb-3 ">
+                                <label for="id_low_stock_quantity" class="form-label">Low Stock Quantity</label>
+                                {{ form.low_stock_quantity }}
+                            </div>
+                            
+                        
+                        <!-- Optional Attributes -->
+                        <hr class="product-only-field">
+                        <div class="mb-3 product-only-field" id="brand_name_wrapper">
+                            <label for="id_brand_name" class="form-label">Brand Name</label>
+                            {{ form.brand_name }}
+                        </div>
+                    
+                        <div class="mb-3 product-only-field" style="display: flex; gap: 10px; align-items: center;" id="color_wrapper">
+                            
+                           <label for="common_colors">Color</label>
+                            <!-- Dropdown of common colors -->
+                            <select id="common_colors" class="form-control" onchange="updateColorPickerFromDropdown(this)">
+                                <option value="">Select common color</option>
+                                <option value="#ffffff">White</option>
+                                <option value="#000000">Black</option>
+                                <option value="#ff0000">Red</option>
+                                <option value="#00ff00">Green</option>
+                                <option value="#0000ff">Blue</option>
+                                <option value="#ffff00">Yellow</option>
+                                <option value="#ffa500">Orange</option>
+                                <option value="#800080">Purple</option>
+                                <option value="#808080">Gray</option>
+                            </select>
+
+                            <!-- Color picker -->
+                            <input type="color" id="color_picker" onchange="updateDropdownFromColorPicker(this)">
+
+                            <!-- Django form field (readonly text input) -->
+                            {{ form.color }}
+
+                            <!-- Preview -->
+
+                        </div>
+                                    
+                       
+                    
+                        <div class="mb-3" id="batch_number_wrapper">
+                            <label for="id_batch_number" class="form-label">Batch Number</label>
+                            {{ form.batch_number }}
+                        </div>
+                    
+                        <div class="mb-3" id="expiry_date_wrapper">
+                            <label for="id_expiry_date" class="form-label">Expiry Date</label>
+                            {{ form.expiry_date }}
+                        </div>
+                    
+                        <!-- Images -->
+                        <hr>
+                        <div class="mb-3" id="image_wrapper">
+                            <label for="id_image" class="form-label">Main Image</label>
+                            {{ form.image }}
+                            <img id="preview" class="image-preview" src="#" alt="Image Preview" hidden>
+                        </div>
+                    
+                        <div class="mb-3" id="gallery_images_wrapper">
+                            <label for="id_gallery_images" class="form-label">Gallery Images</label>
+                            {{ form.gallery_images }}
+                        </div>
+                    
+                        <!-- Delivery & Policies -->
+                       
+                        
+                        
+                        
+                        {{ variant_formset.management_form }}
+                        <div id="standardPrintWrapper" style="display: none;">
+                            
+                            <hr>
+                            <div id="variantSection">
+
+                                {% for form in variant_formset.forms %}
+                                    {% if form.errors %}
+                                        <div class="alert alert-danger">
+                                            {% for field, errors in form.errors.items %}
+                                                {% for error in errors %}
+                                                    {{ field }}: {{ error }}<br>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+
+
+                        
+                                <hr>
+                                <h5 class="form-heading">Variants</h5>
+                                <table class="table table-bordered" id="variant-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sr No</th>
+                                            <th>Paper</th>
+                                            <th>Color Type</th>
+                                            <th>Min Qty</th>
+                                            <th>Max Qty</th>
+                                            <th>Price</th>
+                                            <th>Sided</th>
+                                            <th>Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="variant-formset">
+                                        {% for form in variant_formset %}
+
+                                            <tr class="variant-form">
+                                                <td class="sr-no">{{ forloop.counter }}</td>
+                                                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                <td>{{ form.paper }}</td>
+                                                <td>{{ form.color_type }}</td>
+                                                <td>{{ form.min_quantity }}</td>
+                                                <td>{{ form.max_quantity }}</td>
+                                                <td>{{ form.price }}</td>
+                                                <td>{{ form.sided }}</td>
+                                                <td>
+                                                    {{ form.DELETE }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <button type="button" class="btn btn-outline-primary" id="add-variant">Add Another Variant</button>
+                                                        
+                            </div>
+                        </div>
+
+                        
+                        {{ customize_print_variant_formset.management_form }}
+                        
+                        <div id="customPrintWrapper" style="display: none;">
+                            <hr>
+
+                            <div id="customizevariantSection">
+
+                                {% for form in customize_print_variant_formset.forms %}
+                                    {% if form.errors %}
+                                        <div class="alert alert-danger">
+                                            {% for field, errors in form.errors.items %}
+                                                {% for error in errors %}
+                                                    {{ field }}: {{ error }}<br>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+
+
+                                <h5 class="form-heading">Customize Print Variants</h5>
+                                <table class="table table-bordered" id="variant-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sr No</th>
+                                            <th>Name</th>
+                                            <th>Price</th>
+                                            <th>Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="customize-print-variant-formset">
+                                        {% for form in customize_print_variant_formset %}
+                                            <tr class="custimize-print-variant-form">
+                                                <td class="sr-no">{{ forloop.counter }}</td>
+                                                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                <td>{{ form.size }}</td>
+                                                <td>{{ form.price }}</td>
+                                                <td>
+                                                    {{ form.DELETE }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <button type="button" class="btn btn-outline-primary" id="add-customize-print-variant">Add Another Variant</button>
+                            </div>
+                        </div>
+
+                        {{ formset.management_form }}
+                        
+                        <div id="addon-section" style="display: none;">
+                            <hr>
+                            <h5 class="form-heading">Addons</h5>
+                            
+                            <div >
+                            
+
+                                {% for form in formset.forms %}
+                                    {% if form.errors %}
+                                        <div class="alert alert-danger">
+                                            {% for field, errors in form.errors.items %}
+                                                {% for error in errors %}
+                                                    {{ field }}: {{ error }}<br>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+
+
+
+                                                            
+                                <table class="table table-bordered" id="addon-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sr No</th>
+                                            <th>Addon</th>
+                                            <th>Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="addon-formset">
+                                    {% for form in formset %}
+                                        <tr class="addon-form">
+                                            <td class="sr-no">{{ forloop.counter }}</td>
+
+                                            <td>
+                                                {{ form.addon }}
+                                                <!-- 🔥 Include hidden fields -->
+                                                {% for hidden in form.hidden_fields %}
+                                                    {{ hidden }}
+                                                {% endfor %}
+                                            </td>
+
+                                            <td>{{ form.DELETE }}</td>
+                                        </tr>
+                                    {% endfor %}
+
+                                    </tbody>
+                                </table>
+
+                                <button type="button" class="btn btn-outline-primary" id="add-addon">Add Another Addon</button>
+                            </div>
+                        </div>
+                            
+
+                        
+                        <div id="hide_offline_div">
+                            <hr>
+                        <div id="delivery_div" class="p-3 rounded" style="background: #fff;">
+
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="text-warning fw-bold mb-0">Delivery Details</h6>
+                                <div class="form-check form-switch">
+                                    {{ form.use_default }}
+                                    <label class="form-check-label" for="id_use_default">Use default</label>
+                                </div>
+                            </div>
+                            <hr>
+
+                            <div class="form-check form-switch mb-2">
+                                {{ form.instant_delivery }}
+                                <label class="form-check-label" for="id_instant_delivery">Instant Delivery</label>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                {{ form.self_pickup }}
+                                <label class="form-check-label" for="id_self_pickup">Self Pickup</label>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                {{ form.general_delivery }}
+                                <label class="form-check-label" for="id_general_delivery">General Delivery</label>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                {{ form.is_on_shop }}
+                                <label class="form-check-label" for="id_is_on_shop">On Shop Order</label>
+                            </div>
+                        </div>
+
+
+                        <div id="delivery_div" class="p-3 rounded" style="background: #fff;">
+
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="text-warning fw-bold mb-0">Policies</h6>
+                                <div class="form-check form-switch">
+                                    {{ form.use_default }}
+                                    <label class="form-check-label" for="id_use_default">Use default</label>
+                                </div>
+                            </div>
+                        
+                            <div class="form-check form-switch mb-2">
+                                {{ form.return_policy }}
+                                <label class="form-check-label" for="id_return_policy">Return Policy</label>
+                            </div>
+                        
+                            <div class="form-check form-switch mb-2">
+                                {{ form.cod }}
+                                <label class="form-check-label" for="id_cod">Cash on Delivery</label>
+                            </div>
+                        
+                            <div class="form-check form-switch mb-2">
+                                {{ form.replacement }}
+                                <label class="form-check-label" for="id_replacement">Replacement</label>
+                            </div>
+                        
+                            <div class="form-check form-switch mb-2">
+                                {{ form.shop_exchange }}
+                                <label class="form-check-label" for="id_shop_exchange">Shop Exchange</label>
+                            </div>
+                        
+                            <div class="form-check form-switch mb-2">
+                                {{ form.shop_warranty }}
+                                <label class="form-check-label" for="id_shop_warranty">Shop Warranty</label>
+                            </div>
+
+                    
+                            <div class="form-check form-switch mb-2">
+                                {{ form.brand_warranty }}
+                                <label class="form-check-label" for="id_brand_warranty">Brand Warranty</label>
+                            </div>
+
+                        </div>
+                        </div>
+                    
+                        <!-- Flags -->
+                        
+
+                        <hr>
+
+                        {% if request.user.is_superuser %}
+
+                            <div id="delivery_div" class="p-3 rounded" style="background: #fff;">
+
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-warning fw-bold mb-0">Admin Only</h6>
+                                </div>
+
+                                <div class="form-check form-switch mb-2">
+                                    {{ form.is_popular }}
+                                    <label class="form-check-label" for="id_is_popular">Is Popular</label>
+                                </div>
+                            
+                                <div class="form-check form-switch mb-2">
+                                    {{ form.is_featured }}
+                                    <label class="form-check-label" for="id_is_featured">Is Featured</label>
+                                </div>
+
+                            </div>
+                        
+                        
+                        {% endif %}
+
+                        <div class="form-check form-switch mb-2">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="id_is_active">Is Active</label>
+                        </div>
+
+
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary custom-button">Submit</button>
+                        </div>
+                
+                        </div>
+
+                        
+                        
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Image preview
+</script>
+
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+    // -------------------------- start add more ---------------------------
+
+
+    const addAddonBtn = document.getElementById("add-addon");
+    const addonContainer = document.getElementById("addon-formset");
+    const addonTotalForms = document.getElementById("id_addon-TOTAL_FORMS");
+
+    addAddonBtn?.addEventListener("click", function () {
+        const currentFormCount = parseInt(addonTotalForms.value);
+        const newFormRow = addonContainer.querySelector(".addon-form").cloneNode(true);
+
+        // Update name/id/index for all fields
+        Array.from(newFormRow.querySelectorAll("select, input")).forEach((input) => {
+            if (input.name) input.name = input.name.replace(/-\d+-/, `-${currentFormCount}-`);
+            if (input.id) input.id = input.id.replace(/-\d+-/, `-${currentFormCount}-`);
+            if (input.tagName === "SELECT") {
+                input.selectedIndex = 0;
+            } else {
+                input.value = "";
+            }
+        });
+
+        // Reset hidden id
+        const hiddenId = newFormRow.querySelector("input[type='hidden'][name$='-id']");
+        if (hiddenId) hiddenId.value = "";
+
+        // Update Sr No
+        newFormRow.querySelector(".sr-no").innerText = currentFormCount + 1;
+
+        addonTotalForms.value = currentFormCount + 1;
+        addonContainer.appendChild(newFormRow);
+    });
+
+    // ---------- Variant Section ----------
+    const addVariantBtn = document.getElementById("add-variant");
+    const variantContainer = document.getElementById("variant-formset");
+    const variantTotalForms = document.getElementById("id_print_variants-TOTAL_FORMS");
+
+    addVariantBtn?.addEventListener("click", function () {
+        const currentFormCount = parseInt(variantTotalForms.value);
+        const newFormRow = variantContainer.querySelector(".variant-form").cloneNode(true);
+
+        // Update all field indexes
+        Array.from(newFormRow.querySelectorAll("input, select")).forEach(function (input) {
+            input.name = input.name.replace(/-\d+-/, `-${currentFormCount}-`);
+            input.id = input.id.replace(/-\d+-/, `-${currentFormCount}-`);
+            input.type === 'checkbox' || input.type === 'radio' ? input.checked = false : input.value = '';
+        });
+
+        // Update labels
+        Array.from(newFormRow.querySelectorAll("label")).forEach(function (label) {
+            if (label.htmlFor) {
+                label.htmlFor = label.htmlFor.replace(/-\d+-/, `-${currentFormCount}-`);
+            }
+        });
+
+        // Reset hidden id field if present
+        const hiddenId = newFormRow.querySelector("input[type='hidden'][name$='-id']");
+        if (hiddenId) hiddenId.value = '';
+
+        // Update Sr No
+        newFormRow.querySelector(".sr-no").innerText = currentFormCount + 1;
+
+        variantTotalForms.value = currentFormCount + 1;
+        variantContainer.appendChild(newFormRow);
+    });
+
+    // ---------- add custimize print Variant Section ----------
+
+    const addVariantBtn2 = document.getElementById("add-customize-print-variant");
+    const variantContainer2 = document.getElementById("customize-print-variant-formset");
+    const variantTotalForms2 = document.getElementById("id_print_variants-TOTAL_FORMS");
+
+    addVariantBtn2?.addEventListener("click", function () {
+        const currentFormCount = parseInt(variantTotalForms2.value);
+        const newFormRow = variantContainer2.querySelector(".custimize-print-variant-form").cloneNode(true);
+
+        // Update all field indexes
+        Array.from(newFormRow.querySelectorAll("input, select")).forEach(function (input) {
+            input.name = input.name.replace(/-\d+-/, `-${currentFormCount}-`);
+            input.id = input.id.replace(/-\d+-/, `-${currentFormCount}-`);
+            input.type === 'checkbox' || input.type === 'radio' ? input.checked = false : input.value = '';
+        });
+
+        // Update labels
+        Array.from(newFormRow.querySelectorAll("label")).forEach(function (label) {
+            if (label.htmlFor) {
+                label.htmlFor = label.htmlFor.replace(/-\d+-/, `-${currentFormCount}-`);
+            }
+        });
+
+        // Reset hidden id field if present
+        const hiddenId = newFormRow.querySelector("input[type='hidden'][name$='-id']");
+        if (hiddenId) hiddenId.value = '';
+
+        // Update Sr No
+        newFormRow.querySelector(".sr-no").innerText = currentFormCount + 1;
+
+        variantTotalForms2.value = currentFormCount + 1;
+        variantContainer2.appendChild(newFormRow);
+    });
+
+
+});
+
+// -------------------------- end add more ---------------------------
+
+// --------------------- based on product type hide show  -------------------------
+
+    const productType = document.getElementById("productType");
+    const saleType = document.getElementById("saleType");
+    const variantSection = document.getElementById("customizevariantSection");
+    const foodOptionToggleWrapper = document.getElementById('foodOptionToggleWrapper');
+    const foodToggle = document.getElementById('foodToggle');
+    const foodTypeWrapper = document.getElementById('foodTypeWrapper');
+    const foodTypeField = document.getElementById('foodType') || document.querySelector('[name="food_type"]');
+
+    const allSaleOptions = {
+        'offline': 'Offline Only',
+        'online': 'Online Only',
+        'both': 'Both Online & Offline',
+    };
+
+    function clearSaleTypeOptions() {
+        saleType.innerHTML = '';
+    }
+
+    function addSaleTypeOption(value, text) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.text = text;
+        option.selected = true; // <-- mark as selected
+        saleType.appendChild(option);
+    }
+
+    function setSaleTypeOptionsForPrint() {
+    // Clear old options
+    saleType.innerHTML = '';
+
+    // Create and append new option
+    let option = document.createElement('option');
+    option.value = 'online';
+    option.text = 'Online Only';
+    option.selected = true;
+    saleType.appendChild(option);
+
+    // Set value explicitly
+    saleType.value = 'online';
+
+    // Prevent user from changing it visually
+    saleType.addEventListener('mousedown', function (e) {
+        e.preventDefault(); // stops dropdown from opening
+    });
+
+    // Add a hidden input so value still goes to server
+    let hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = 'sale_type';
+    hiddenInput.value = saleType.value;
+    saleType.parentNode.appendChild(hiddenInput);
+}
+
+
+
+    function setSaleTypeOptionsDefault(productType) {
+        clearSaleTypeOptions();
+
+        Object.entries(allSaleOptions).forEach(([value, text]) => {
+            // 👇 if not print, exclude "online"
+            if (productType !== 'print' && value === 'online') return;
+            addSaleTypeOption(value, text);
+        });
+
+        saleType.removeAttribute('disabled');
+        saleType.value = 'offline'; // 👈 set default to offline (or 'both' if preferred)
+    }
+
+
+    // for hiding/ showing product fields on  product type fields
+    function toggleProductOnlyFields(show) {     
+        const exemptIds = ["id_track_serial_numbers", "id_low_stock_alert"];
+
+        document.querySelectorAll('.product-only-field').forEach(el => {
+            el.style.display = show ? '' : 'none';
+            el.querySelectorAll('input, select, textarea').forEach(input => {
+                // disable/enable normally
+                input.disabled = !show;
+
+                // check if this input is in exempt list
+                if (exemptIds.includes(input.id)) {
+                    input.required = false;  // never required
+                } else {
+                    input.required = show;   // follow normal logic
+                }
+            });
+        });
+
+    }
+
+    function toggleVariantFormSection(show) {
+        if (!variantSection) return;
+        variantSection.style.display = show ? 'block' : 'none';
+        variantSection.querySelectorAll("input, select, textarea").forEach(el => {
+            el.disabled = !show;
+            el.required = show;
+        });
+    }
+
+
+    // for hiding delivery option for offline product
+    function handleSaleTypeChange() {
+        const saleTypeValue = saleType.value;
+        const targetDiv = document.getElementById("hide_offline_div"); // 👈 replace with your div's ID
+
+        if (saleTypeValue === 'offline') {
+            targetDiv.style.display = 'none';
+        } else {
+            targetDiv.style.display = 'block';
+        }
+    }
+
+    function handleFoodToggleChange() {
+        if (!foodTypeWrapper || !foodTypeField) return;
+        if (foodToggle.checked) {
+            foodTypeWrapper.style.display = 'block';
+            foodTypeField.disabled = false;
+            foodTypeField.required = true;
+        } else {
+            foodTypeWrapper.style.display = 'none';
+            foodTypeField.disabled = true;
+            foodTypeField.required = false;
+            foodTypeField.value = '';
+        }
+    }
+
+   
+
+
+
+ function adjustFormFields(productType, saleType) {
+    console.log(productType)
+    console.log(saleType)
+        const key = `${productType}_${saleType}`;
+        const rules = {
+            'product_offline': {
+                category: 'optional',
+                sub_category: 'optional',
+                brand_name: 'optional',
+                color: 'optional',
+                size: 'optional',
+                batch_number: 'optional',
+                expiry_date: 'optional',
+                description: 'optional',
+                image: 'optional',
+                gallery_images: 'hide'
+            },
+            'product_both': {
+                category: 'required',
+                sub_category: 'required',
+                brand_name: 'optional',
+                color: 'optional',
+                size: 'optional',
+                batch_number: 'optional',
+                expiry_date: 'optional',
+                description: 'optional',
+                image: 'required',
+                gallery_images: 'optional'
+            },
+            'service_offline': {
+                category: 'optional',
+                sub_category: 'optional',
+                brand_name: 'optional',
+                color: 'optional',
+                size: 'optional',
+                batch_number: 'optional',
+                expiry_date: 'optional',
+                description: 'optional',
+                image: 'optional',
+                gallery_images: 'hide'
+            },
+            'service_both': {
+                category: 'required',
+                sub_category: 'required',
+                brand_name: 'optional',
+                color: 'optional',
+                size: 'optional',
+                batch_number: 'optional',
+                expiry_date: 'optional',
+                description: 'optional',
+                image: 'required',
+                gallery_images: 'optional'
+            },
+            'print_both': {
+                category: 'required',
+                sub_category: 'required',
+                brand_name: 'hide',
+                color: 'hide',
+                size: 'hide',
+                batch_number: 'hide',
+                expiry_date: 'hide',
+                description: 'hide',
+                image: 'hide',
+                gallery_images: 'hide'
+            }
+        };
+
+        const config = rules[key];
+        if (!config) return;
+
+        Object.entries(config).forEach(([field, rule]) => {
+            const wrapper = document.getElementById(`${field}_wrapper`);
+            const input = document.getElementById(`id_${field}`);
+            if (!wrapper || !input) return;
+
+            switch (rule) {
+                case 'required':
+                    wrapper.style.display = 'block';
+                    input.disabled = false;
+                    input.required = true;
+                    break;
+                case 'optional':
+                    wrapper.style.display = 'block';
+                    input.disabled = false;
+                    input.required = false;
+                    break;
+                case 'hide':
+                    wrapper.style.display = 'none';
+                    input.disabled = true;
+                    input.required = false;
+                    break;
+            }
+        });
+    }
+
+
+
+
+    document.getElementById('productType').addEventListener('change', updateFieldLogic);
+    document.getElementById('saleType').addEventListener('change', updateFieldLogic);
+
+    function updateFieldLogic() {
+        const productType = document.getElementById('productType').value;
+        const saleType = document.getElementById('saleType').value;
+        adjustFormFields(productType, saleType);
+    }
+
+    saleType.addEventListener('change', handleSaleTypeChange);   // for hiding delivery option for offline product
+    document.addEventListener('DOMContentLoaded', handleSaleTypeChange);    // for hiding delivery option for offline product onload
+
+    const customizePrintToggleWrapper = document.getElementById('customizePrintToggleWrapper');
+    const customPrintToggle = document.getElementById('customPrintToggle');
+    const standardPrintWrapper = document.getElementById('standardPrintWrapper');
+    const customPrintWrapper = document.getElementById('customPrintWrapper');
+    const addon_section = document.getElementById('addon-section');
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, calling handleCustomPrintToggleChange()');
+        handleCustomPrintToggleChange();
+    });
+
+
+
+    // Attach the handler to the checkbox (or however the toggle is triggered)
+    customPrintToggle.addEventListener('change', handleCustomPrintToggleChange);
+
+    // Optional: run once on load to ensure state is correct
+
+    function changeMrpLabel(newText) {
+        const mrpLabel = document.querySelector('label[for="id_mrp"]');
+        if (mrpLabel) {
+            mrpLabel.textContent = newText;
+        }
+    }
+
+// Usage:
+changeMrpLabel("Selling Price");
+
+
+
+    // Example usage in your existing logic:
+   
+    function handleProductTypeChange() {
+        const selectedType = productType?.value;
+
+        if (selectedType === 'print') {
+            setSaleTypeOptionsForPrint();
+            
+            toggleVariantFormSection(true);
+            toggleProductOnlyFields(false); 
+        
+            console.log('in here')
+
+            changeMrpLabel("Base MRP");
+            
+            addon_section.style.display = 'block';
+
+            standardPrintWrapper.style.display = 'block';
+
+            foodOptionToggleWrapper.style.display = 'none';
+            if (foodToggle) foodToggle.checked = false;
+            handleFoodToggleChange();
+
+            // Show customize print toggle and related wrappers
+            customizePrintToggleWrapper.style.display = 'block';
+            handleCustomPrintToggleChange(); // Initial state
+        } else {
+            setSaleTypeOptionsDefault();
+            toggleVariantFormSection(selectedType === 'product');
+            toggleProductOnlyFields(selectedType === 'product');
+            
+            addon_section.style.display = 'none';
+
+            changeMrpLabel("MRP");
+
+            foodOptionToggleWrapper.style.display = selectedType === 'service' ? 'block' : 'none';
+
+            handleFoodToggleChange();
+
+            // Hide all customize print stuff
+            customizePrintToggleWrapper.style.display = 'none';
+            standardPrintWrapper.style.display = 'none';
+            customPrintWrapper.style.display = 'none';
+
+           
+            customPrintWrapper.querySelectorAll('input, select, textarea').forEach(el => {
+                el.disabled = true;
+                el.required = false;
+            });
+
+
+
+
+        }
+    }
+
+    // Add listener
+        if (customPrintToggle) {
+            customPrintToggle.addEventListener("change", handleCustomPrintToggleChange);
+        }
+
+            // Event listeners
+        if (productType) {
+            productType.addEventListener("change", handleProductTypeChange);
+        }
+        if (foodToggle) {
+            foodToggle.addEventListener("change", handleFoodToggleChange);
+        }
+
+        // Initial setup
+        handleProductTypeChange();
+
+
+
+// -------------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", function () {
+    const checkbox = document.getElementById("id_tax_inclusive");
+    const gstInput = document.getElementById("tax_div");
+
+    function toggleGSTInput() {
+      gstInput.style.display = checkbox.checked ? "none" : "block";
+    }
+
+    checkbox.addEventListener("change", toggleGSTInput);
+
+    // Initialize on page load
+    toggleGSTInput();
+  });
+
+  const colorPicker = document.getElementById("color_picker");
+  const colorValue = document.getElementById("color_value");
+  const colorPreview = document.getElementById("color_preview");
+  const commonColors = document.getElementById("common_colors");
+
+  function updateColorPickerFromDropdown(select) {
+    if (select.value) {
+      colorPicker.value = select.value;
+      colorValue.value = select.value;
+      colorPreview.style.background = select.value;
+    }
+  }
+
+  function updateDropdownFromColorPicker(picker) {
+    colorValue.value = picker.value;
+    colorPreview.style.background = picker.value;
+    commonColors.value = ""; // Reset dropdown selection
+  }
+
+  // Initialize on load
+  window.onload = function() {
+    const initialColor = "{{ form.color.value|default:'' }}";  // <--- wrap in quotes
+    console.log(initialColor);
+    console.log(initialColor)
+    if (initialColor) {
+      colorPicker.value = initialColor;
+      colorPreview.style.background = initialColor;
+
+      for (let i = 0; i < commonColors.options.length; i++) {
+        if (commonColors.options[i].value.toLowerCase() === initialColor.toLowerCase()) {
+          commonColors.selectedIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  
+function handleCustomPrintToggleChange() {
+    const isCustom = document.getElementById('customPrintToggle')?.checked;
+    const select = document.querySelector('#id_print_variants-0-paper');
+
+    console.log('sdsdsd')
+
+    if (isCustom) {
+        standardPrintWrapper.style.display = 'none';
+        customPrintWrapper.style.display = 'block';
+
+       customPrintWrapper.querySelectorAll('input, select, textarea').forEach(el => {
+            el.disabled = false;
+            el.required = false;
+        });
+
+        if (select) {
+            select.removeAttribute('required');
+        }
+
+    } else {
+
+        customPrintWrapper.style.display = 'none';
+        if (selectedType === 'print') {
+            standardPrintWrapper.style.display = 'block';
+        }
+
+        
+
+         customPrintWrapper.querySelectorAll('input, select, textarea').forEach(el => {
+            el.disabled = true;
+            el.required = true;
+        });
+
+        if (select) {
+            select.setAttribute('required', 'required');
+        }
+    }
+}
+
+    
+    // ✅ Then: Run it on DOM load
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.getElementById('customPrintToggle');
+        if (toggle) {
+            toggle.addEventListener('change', handleCustomPrintToggleChange);
+            handleCustomPrintToggleChange();
+        }
+    });
+
+
+
+  window.addEventListener("DOMContentLoaded", () => {
+    console.log("-------------------")
+
+    colorValue.value = colorPicker.value;
+    colorPreview.style.background = colorPicker.value;
+
+    handleProductTypeChange();
+
+  });
+
+
+
+
+  
+  
+  // --------------------- Inline native validation messages for all fields ---------------------
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('product-form') || document.querySelector('form');
+    if (!form) return;
+
+    function showError(el) {
+      if (!el || el.validity.valid) return;
+      let container = el.parentNode;
+      // Remove any existing error under this parent
+      const prev = container.querySelector('.validation-error');
+      if (prev) prev.remove();
+      const msg = document.createElement('div');
+      msg.className = 'validation-error text-danger small';
+      msg.textContent = el.validationMessage || 'Please fill out this field.';
+      container.appendChild(msg);
+    }
+
+    function clearError(el) {
+      const container = el?.parentNode;
+      if (!container) return;
+      const prev = container.querySelector('.validation-error');
+      if (prev) prev.remove();
+    }
+
+    // On submit: prevent default if invalid and show messages for all invalid fields
+    form.addEventListener('submit', function (e) {
+      // Clear old messages
+      form.querySelectorAll('.validation-error').forEach(n => n.remove());
+
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+        const invalidEls = form.querySelectorAll(':invalid');
+        let first;
+        invalidEls.forEach(el => {
+          // skip hidden/disabled
+          if (el.disabled) return;
+          if (el.offsetParent === null) return;
+          showError(el);
+          if (!first) first = el;
+        });
+        first?.focus?.();
+      }
+    }, true);
+
+    // Suppress native bubble and show inline on each invalid event
+    form.addEventListener('invalid', function (e) {
+      e.preventDefault();
+      const el = e.target;
+      // skip hidden/disabled
+      if (el.disabled) return;
+      if (el.offsetParent === null) return;
+      showError(el);
+    }, true);
+
+    // Live clear when field becomes valid
+    form.querySelectorAll('input, select, textarea').forEach(el => {
+      el.addEventListener('input', () => {
+        if (el.checkValidity()) clearError(el);
+      });
+      el.addEventListener('change', () => {
+        if (el.checkValidity()) clearError(el);
+      });
+    });
+  });
+
+     </script>
+    
+
+
+
+<script>
+
+    document.getElementById("use-defaults-btn").addEventListener("click", function () {
+    fetch("{% url 'product_defaults' %}")
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                const data = result.data;
+                for (const field in data) {
+                    console.log(field)
+                    try {
+                        let el = document.querySelector(`[name="${field}"]`);
+                        if (el && data[field] !== null && data[field] !== "") {
+                            if (el.tagName.toLowerCase() === 'select') {
+                                el.value = data[field];
+                            }
+                            else if (el.type === 'file') {
+                                console.warn(`Skipping file input: ${field}`);
+                            }
+                            else if (el.type === 'checkbox') {
+                                el.checked = Boolean(data[field]); // ✅ handle checkboxes
+                            }
+                            else {
+                                el.value = data[field];
+                            }
+                        }
+                    } catch (err) {
+                        console.error(`Error setting field "${field}":`, err);
+                    }
+                }
+            } else {
+                console.warn("No defaults found or failed to fetch.");
+            }
+        })
+        .catch(error => {
+            console.error("Error fetching defaults:", error);
+        });
+    });
+
+
+</script>
+
+
+
+
+
+{% endblock extra_js %}

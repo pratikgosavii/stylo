@@ -1,0 +1,57 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+{% block title %}Return / Exchange Detail{% endblock %}
+{% block content %}
+<div class="main-content">
+  <div class="page-content">
+    <div class="container-fluid">
+      <div class="row"><div class="col-12">
+        <div class="card">
+          <div class="card-header"><h4>Return / Exchange Details</h4></div>
+          <div class="card-body">
+            <h5>Order Information</h5>
+            <p><strong>Order ID:</strong> {{ data.order_item.order.id }}</p>
+            <p><strong>User:</strong> {{ data.user }}</p>
+            <p><strong>Payment Method:</strong> {{ data.order_item.order.payment_method }}</p>
+            <p><strong>Total Amount:</strong> ₹{{ data.order_item.order.total_amount }}</p>
+            <p><strong>Shipping Address:</strong> {{ data.order_item.order.address }}</p>
+            <hr>
+            <h5>Product Item</h5>
+            <p>{{ data.order_item.product.name }} × {{ data.order_item.quantity }}</p>
+            <p><strong>Status:</strong> {{ data.order_item.status|capfirst }}</p>
+            <hr>
+            <h5>Request Details</h5>
+            <p><strong>Type:</strong> {{ data.get_type_display }}</p>
+            <p><strong>Reason:</strong> {{ data.reason }}</p>
+            <p><strong>Current Status:</strong> 
+    {% if data.order_item.status == 'returned/replaced_requested' %}
+        <span class="badge bg-warning">{{ data.order_item.status|capfirst }}</span>
+    {% elif data.order_item.status == 'returned/replaced_approved' %}
+        <span class="badge bg-success">{{ data.order_item.status|capfirst }}</span>
+    {% elif data.order_item.status == 'returned/replaced_rejected' %}
+        <span class="badge bg-danger">{{ data.order_item.status|capfirst }}</span>
+    {% elif data.order_item.status == 'returned/replaced_completed' %}
+        <span class="badge bg-primary">{{ data.order_item.status|capfirst }}</span>
+    {% elif data.order_item.status == 'returned/replaced_cancelled' %}
+        <span class="badge bg-secondary">{{ data.order_item.status|capfirst }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark">{{ data.order_item.status|capfirst }}</span>
+    {% endif %}
+</p>
+
+            <p><strong>Requested On:</strong> {{ data.created_at|date:"d M Y, h:i A" }}</p>
+            <div class="mt-3">
+              {% if data.order_item.status == 'returned/replaced_requested' %}
+    <a href="{% url 'approve_return' data.id %}" class="btn btn-success btn-sm">Mark as Approve</a>
+    <a href="{% url 'reject_return' data.id %}" class="btn btn-danger btn-sm">Mark as Reject</a>
+{% elif data.order_item.status == 'returned/replaced_approved' %}
+    <a href="{% url 'completed_return' data.id %}" class="btn btn-success btn-sm">Mark as Completed</a>
+{% endif %}
+            </div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

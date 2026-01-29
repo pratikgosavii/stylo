@@ -1,0 +1,924 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Create Category{% endblock title %}
+
+
+{% block extra_css %}
+    <!-- plugin css -->
+   <link href="{% static 'libs/select2/dist/css/select2.min.css'%}" rel="stylesheet" type="text/css" />
+ <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f0d28c;
+            padding-bottom: 20px;
+        }
+
+        .form-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-heading {
+            text-align: left;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 2rem;
+            color: #775599;;
+        }
+
+        .description-box {
+            height: 150px;
+            resize: none;
+        }
+
+        .image-preview {
+            max-height: 100px;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background-color: #775599;;
+            border-color: #775599;;
+        }
+
+        .custom-button {
+            width: 150px;
+        }
+
+
+        textarea[name="references"],
+textarea[name="notes"],
+textarea[name="terms"] {
+  min-height: 60px;
+  max-height: 60px;
+  width: 100%;
+}
+
+
+    </style>
+
+     <style>
+        body {
+            background-color: #f0d28c;
+            padding-bottom: 20px;
+        }
+        .form-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .form-heading {
+            text-align: left;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 2rem;
+            color: #ffdb8a;
+        }
+        .btn-primary {
+            background-color: #775599;
+            border-color: #775599;
+        }
+        .custom-button {
+            width: 150px;
+        }
+    </style>
+
+     <style>
+    /* Custom Toggle Switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: orange;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(22px);
+    }
+</style>
+
+
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="main-content">
+    <div class="page-content">
+      <div class="container-fluid">
+        <!-- start page title -->
+        <div class="row">
+            <div class="col-12">
+                <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                    <h4 class="mb-sm-0 font-size-18">Purchase</h4>
+                </div>
+            </div>
+        </div>
+
+      
+
+
+
+        <div class="container">
+          <div class="form-container">
+            <form method="POST" enctype="multipart/form-data">
+              {% csrf_token %}
+              <!-- Category Title Section -->
+              <div class="card mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <!-- Static purchase code display -->
+                  
+
+                      <div class="mb-3">
+                        <label class="form-label">Purchase Code</label>
+
+
+                        {% if form.purchase_code %}
+                            <!-- Add form: show readonly input -->
+                            {{ form.purchase_code }}
+                        {% else %}
+                            <!-- Update form: show static bold text -->
+                            <strong class="fw-bold">{{ form.instance.purchase_code }}</strong>
+                        {% endif %}
+                      </div>
+
+
+
+                      
+
+
+
+
+                      
+                      
+                    </div>
+
+                    <div class="text-muted">
+                      <!-- Render purchase_date as an input for editing -->
+                      {{ form.purchase_date }}
+                      {% if form.purchase_date.errors %}
+                        <div class="text-danger mt-1 small">
+                          {{ form.purchase_date.errors.0 }}
+                        </div>
+                      {% endif %}
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vendor -->
+              <div class="card mb-3">
+                <div class="card-body">
+                  <div class="mb-3">
+                    <label for="vendor" class="form-label">
+                      <i class="bi bi-person-badge"></i> Vendor
+                    </label>
+                    {{ form.vendor }}
+                    {% if form.vendor.errors %}
+                      <div class="text-danger">{{ form.vendor.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <!-- Product -->
+                  <select id="product-options" style="display:none;">
+                    {% for p in data %}
+                      <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <h5>Products</h5>
+
+                  <div id="products-wrapper">
+
+                     <div class="row fw-bold border-bottom pb-2 mb-2">
+    <div class="col-md-4">Product</div>
+    <div class="col-md-2">Quantity</div>
+    <div class="col-md-2">Purchase Price</div>
+    <div class="col-md-2">Total</div>
+    <div class="col-md-2">Action</div>
+  </div>
+
+  
+  {% for pid in existing_product_ids %}
+    <div class="product-row row g-2 mb-2 align-items-center">
+
+      <!-- Product Dropdown -->
+      <div class="col-md-4">
+        <select name="products" class="form-control product-select">
+          {% for p in data %}
+            <option value="{{ p.id }}" {% if p.id == pid %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Quantity -->
+      <div class="col-md-2">
+        <input type="number" name="quantity" class="form-control quantity" placeholder="Qty" min="1" value="1">
+      </div>
+
+      <!-- Price -->
+      <div class="col-md-2">
+        <input type="text" name="price" class="form-control price" placeholder="Price">
+      </div>
+
+      <!-- Total -->
+      <div class="col-md-2">
+        <input type="text" name="total_price" class="form-control total-price" placeholder="Total" readonly>
+      </div>
+
+      <!-- Remove Button -->
+      <div class="col-md-2">
+        <button type="button" class="btn btn-danger btn-sm w-100 remove-row">Remove</button>
+      </div>
+
+    </div>
+  {% empty %}
+  {% endfor %}
+</div>
+
+<button type="button" id="add-product" class="btn btn-secondary mt-2 mb-3">Add Product</button>
+
+                  <br>
+                </div>
+              </div>
+
+              <!-- Supplier Invoice Section -->
+              <div class="card mb-3">
+                <div class="card-header">
+                  <strong>Supplier Invoice</strong>
+                </div>
+                <div class="card-body">
+                  <div class="mb-3">
+                    <label for="supplier_invoice_date" class="form-label">
+                      <i class="bi bi-calendar"></i> Supplier Invoice Date
+                    </label>
+                    {{ form.supplier_invoice_date }}
+                    {% if form.supplier_invoice_date.errors %}
+                      <div class="text-danger">{{ form.supplier_invoice_date.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+                  <div class="mb-3">
+                    <label for="serial_number" class="form-label">
+                      <i class="bi bi-upc-scan"></i> Serial Number
+                    </label>
+                    {{ form.serial_number }}
+                    {% if form.serial_number.errors %}
+                      <div class="text-danger">{{ form.serial_number.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Optional Fields -->
+              <div class="card mb-3">
+                <div class="card-body">
+                 
+                  <div class="mb-3">
+                    <label for="references" class="form-label">
+                      <i class="bi bi-link-45deg"></i> References
+                    </label>
+                    {{ form.references }}
+                    {% if form.references.errors %}
+                      <div class="text-danger">{{ form.references.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="notes" class="form-label">
+                      <i class="bi bi-chat-left-text"></i> Notes
+                    </label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                      <div class="text-danger">{{ form.notes.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="terms" class="form-label">
+                      <i class="bi bi-card-text"></i> Terms
+                    </label>
+                    {{ form.terms }}
+                    {% if form.terms.errors %}
+                      <div class="text-danger">{{ form.terms.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="delivery_shipping_charges" class="form-label">
+                      <i class="bi bi-truck"></i> Delivery / Shipping Charges
+                    </label>
+                    {{ form.delivery_shipping_charges }}
+                    {% if form.delivery_shipping_charges.errors %}
+                      <div class="text-danger">{{ form.delivery_shipping_charges.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="packaging_charges" class="form-label">
+                      <i class="bi bi-box2"></i> Packaging Charges
+                    </label>
+                    {{ form.packaging_charges }}
+                    {% if form.packaging_charges.errors %}
+                      <div class="text-danger">{{ form.packaging_charges.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="packaging_charges" class="form-label">
+                      <i class="bi bi-box2"></i> Eway Bill No
+                    </label>
+                    {{ form.eway_bill_no }}
+                    {% if form.eway_bill_no.errors %}
+                      <div class="text-danger">{{ form.eway_bill_no.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="packaging_charges" class="form-label">
+                      <i class="bi bi-box2"></i>LR Number
+                    </label>
+                    {{ form.lr_no }}
+                    {% if form.lr_no.errors %}
+                      <div class="text-danger">{{ form.lr_no.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="packaging_charges" class="form-label">
+                      <i class="bi bi-box2"></i>Vehicle Number
+                    </label>
+                    {{ form.vehicle_no }}
+                    {% if form.vehicle_no.errors %}
+                      <div class="text-danger">{{ form.vehicle_no.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="packaging_charges" class="form-label">
+                      <i class="bi bi-box2"></i>Transport Number
+                    </label>
+                    {{ form.transport_name }}
+                    {% if form.transport_name.errors %}
+                      <div class="text-danger">{{ form.transport_name.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+
+
+                  
+                </div>
+              </div>
+
+              <div class="border rounded p-3 mb-4">
+
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Payment</label>
+                  <div class="btn-group" role="group" aria-label="Payment method">
+                    <button type="button" class="btn {% if form.instance.payment_method == 'cash' %}btn-warning{% else %}btn-outline-dark{% endif %}"
+                            onclick="selectPayment('cash', this)">Cash</button>
+
+                            <button type="button" class="btn {% if form.instance.payment_method == 'upi' %}btn-warning{% else %}btn-outline-dark{% endif %}"
+                            onclick="selectPayment('upi', this)">UPI</button>
+
+                    <button type="button" class="btn {% if form.instance.payment_method == 'card' %}btn-warning{% else %}btn-outline-dark{% endif %}"
+                            onclick="selectPayment('card', this)">Card</button>
+
+
+                    <button type="button" class="btn {% if form.instance.payment_method == 'credit' %}btn-warning{% else %}btn-outline-dark{% endif %}"
+                            onclick="selectPayment('credit', this)">Credit</button>
+                  </div>
+
+                  {% if form.payment_method.errors %}
+                    <div class="text-danger">{{ form.payment_method.errors.0 }}</div>
+                  {% endif %}
+
+                  <input type="hidden" name="payment_method" id="payment_method"
+                        value="{{ form.instance.payment_method|default:'cash' }}" required>
+                </div>
+
+                <!-- Discount -->
+                <div class="row mb-3">
+                <div class="col-md-4">
+                  <label class="form-label mt-2">Discount (₹)</label>
+                  {{ form.discount_amount }}
+
+                  <label class="form-label">Discount (%)</label>
+                                {{ form.discount_percentage }}
+
+                </div>
+                </div>
+                  {% if form.discount_percent.errors %}
+                    <div class="text-danger">{{ form.discount_percent.errors.0 }}</div>
+                  {% endif %}
+                  {% if form.discount_amount.errors %}
+                    <div class="text-danger">{{ form.discount_amount.errors.0 }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- Advance -->
+              <div id="credit_time" style="display: none;">
+
+                <div class="mb-4"><label class="form-label mt-3">Advance Amount</label>
+                  {{ form.advance_payment_amount }}
+                  <label class="form-label fw-semibold">Advance Payment Mode</label>
+                  <div class="btn-group" role="group" aria-label="Advance Payment Method">
+                      <button type="button" class="btn btn-warning" onclick="selectAdvancePayment('cash', this)">Cash</button>
+                      <button type="button" class="btn btn-outline-dark" onclick="selectAdvancePayment('bank', this)">Bank</button>
+                  </div>
+                  <input type="hidden" name="advance_payment_method" id="advance_payment_method" value="cash" required>
+
+                  <!-- Bank dropdown (hidden by default) -->
+
+                  <!-- Advance Amount -->
+                   {% if form.advance_amount.errors %}
+                    <div class="text-danger">{{ form.advance_amount.errors.0 }}</div>
+                  {% endif %}
+                  {% if form.advance_mode.errors %}
+                    <div class="text-danger">{{ form.advance_mode.errors.0 }}</div>
+                  {% endif %}
+                </div>
+                 
+                
+               
+
+                <!-- Due Date -->
+                <div class="mb-3" id="due_date_wrapper" style="display: none;">
+                  <label class="form-label fw-semibold">Due Date</label>
+                  <input type="date" class="form-control" name="due_date" id="due_date" value="{{ form.instance.due_date|date:'Y-m-d' }}">
+                  {% if form.due_date.errors %}
+                    <div class="text-danger">{{ form.due_date.errors.0 }}</div>
+                  {% endif %}
+                </div>
+
+              </div>
+
+               <div id="advance-bank-dropdown" class="mt-2" style="display: none;">
+                  <select name="advance_bank" id="advance_bank" class="form-select" >
+                    <option value="">Select Bank</option>
+                    {% for bank in banks %}
+                        <option value="{{ bank.id }}" {% if form.instance.advance_bank and form.instance.advance_bank.id == bank.id %}selected{% endif %}>
+                            {{ bank.name }}
+                        </option>
+                    {% endfor %}
+                  </select>
+                </div>
+         
+
+              {% comment %} <div class="border rounded p-3 bg-white shadow-sm mb-4">
+                <h5 class="fw-bold mb-3">Summary</h5>
+                <p>Total Items: <span id="total-items">0</span></p>
+                <p>Total Amount before Discount: ₹<span id="total-amount-before-discount">0.00</span></p>
+                <p>Discount: ₹<span id="discount-amount">0.00</span></p>
+                <p>Total Amount: ₹<span id="total-amount">0.00</span></p>
+
+                <hr>
+
+                <div id="advance_summary" style="display:none">
+                  <p>Advance Payment: ₹<span id="advance-amount">0.00</span></p>
+                  <p>Advance Mode: <span id="advance-mode">Cash</span> 
+                      <span id="advance-bank-name" style="display:none;">(Bank Name)</span>
+                  </p>
+                </div>
+
+                <p><strong>Net Payable: ₹<span id="net-payable">0.00</span></strong></p>
+                
+              </div> {% endcomment %}
+
+                                <!-- Submit Button -->
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary custom-button">Submit</button>
+            </div>
+        </form>
+    </div>
+
+</div>
+</div>
+      </div>
+          <!-- container-fluid -->
+  </div>
+    <!-- End Page-content -->
+
+    {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+</div>
+
+{% endblock content %}
+
+
+{% block extra_js %}
+    <!-- apexcharts -->
+    <script src="{% static 'libs/apexcharts/dist/apexcharts.min.js' %}"></script>
+    <script>
+        // Image preview logic
+       
+    </script>
+    <script>
+        // Auto-hide toast after 5 seconds
+        setTimeout(() => {
+            const toastElement = document.getElementById("toast");
+            if (toastElement) {
+                toastElement.classList.remove("show"); // Hide toast
+                setTimeout(() => {
+                    toastElement.remove(); // Remove from DOM
+                }, 500); // Wait for fade-out animation
+            }
+        }, 5000);
+    </script>
+
+    <!-- Plugins js-->
+   
+
+    <script>
+
+        
+function displaySelectedImages() {
+    const input = document.getElementById("images");
+    const selectedImagesContainer = document.getElementById("imagesPreview");
+    selectedImagesContainer.innerHTML = ""; // Clear previously displayed images
+
+    Array.from(input.files).forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageDiv = document.createElement("div");
+          imageDiv.style.position = "relative";
+          const img = document.createElement("img");
+          img.src = event.target.result;
+          img.alt = file.name;
+          img.style.width = "100px";
+          img.style.height = "100px";
+          img.style.objectFit = "cover";
+          img.style.border = "1px solid #ddd";
+          img.style.borderRadius = "5px";
+          imageDiv.appendChild(img);
+          selectedImagesContainer.appendChild(imageDiv);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+
+
+  
+
+    </script>
+
+  <script src="{% static 'libs/select2/dist/js/select2.min.js'%}"></script>
+
+    <!-- init js -->
+    <script src="{% static 'js/pages/ecommerce-select2.init.js'%}"></script>
+
+    <script>
+        
+
+
+  
+</script>
+
+<script>
+function createProductRow() {
+    const row = document.createElement('div');
+    row.className = 'product-row row g-2 mb-2 align-items-center';
+
+    // Product select
+    const colProduct = document.createElement('div');
+    colProduct.className = 'col-md-4';
+    const select = document.createElement('select');
+    select.name = 'products';
+    select.className = 'form-control product-select';
+    select.innerHTML = document.getElementById('product-options').innerHTML;
+    colProduct.appendChild(select);
+
+    // Quantity
+    const colQty = document.createElement('div');
+    colQty.className = 'col-md-2';
+    const qty = document.createElement('input');
+    qty.type = 'number';
+    qty.name = 'quantity';
+    qty.className = 'form-control quantity';
+    qty.value = 1;
+    qty.min = 1;
+    colQty.appendChild(qty);
+
+    // Price
+    const colPrice = document.createElement('div');
+    colPrice.className = 'col-md-2';
+    const price = document.createElement('input');
+    price.type = 'text';
+    price.name = 'price';
+    price.className = 'form-control price';
+    price.placeholder = 'Price';
+    colPrice.appendChild(price);
+
+    // Total
+    const colTotal = document.createElement('div');
+    colTotal.className = 'col-md-2';
+    const total = document.createElement('input');
+    total.type = 'text';
+    total.name = 'total_price';
+    total.className = 'form-control total-price';
+    total.placeholder = 'Total';
+    total.readOnly = true;
+    colTotal.appendChild(total);
+
+    // Remove
+    const colRemove = document.createElement('div');
+    colRemove.className = 'col-md-2';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-danger btn-sm w-100 remove-row';
+    removeBtn.textContent = 'Remove';
+    colRemove.appendChild(removeBtn);
+
+    // Append all cols to row
+    row.appendChild(colProduct);
+    row.appendChild(colQty);
+    row.appendChild(colPrice);
+    row.appendChild(colTotal);
+    row.appendChild(colRemove);
+
+    return row;
+}
+
+// Add new product row
+document.getElementById('add-product').addEventListener('click', function () {
+    const wrapper = document.getElementById('products-wrapper');
+    const newRow = createProductRow();
+    wrapper.appendChild(newRow);
+    $(newRow).find('.product-select').select2({placeholder:'Select Product', width:'100%'});
+});
+
+// Remove row
+document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('remove-row')) {
+        const rows = document.querySelectorAll('.product-row');
+        if (rows.length > 1) e.target.closest('.product-row').remove();
+    }
+});
+
+// Fetch price on product change
+$(document).on('select2:select', '.product-select', function (e) {
+    const $row = $(this).closest('.product-row');
+    const productId = $(this).val();
+    const qty = parseFloat($row.find('.quantity').val()) || 0;
+
+    $.ajax({
+        url: "{% url 'get_product_price' %}",
+        data: { product_id: productId },
+        success: function(data){
+            const price = parseFloat(data.price) || 0;
+            $row.find('.price').val(price.toFixed(2));
+            $row.find('.total-price').val((qty*price).toFixed(2));
+        },
+        error: function(){
+            $row.find('.price').val('');
+            $row.find('.total-price').val('');
+        }
+    });
+});
+
+
+// Update total on quantity change
+document.addEventListener('input', function(e){
+    if(e.target.classList.contains('quantity')){
+        const row = e.target.closest('.product-row');
+        const price = parseFloat(row.querySelector('.price').value) || 0;
+        const qty = parseFloat(e.target.value) || 0;
+        row.querySelector('.total-price').value = (price*qty).toFixed(2);
+    }
+});
+
+// Update total on price change
+document.addEventListener('input', function(e){
+    if(e.target.classList.contains('price')){
+        const row = e.target.closest('.product-row');
+        const qty = parseFloat(row.querySelector('.quantity').value) || 0;
+        const price = parseFloat(e.target.value) || 0;
+        row.querySelector('.total-price').value = (price*qty).toFixed(2);
+    }
+});
+</script>
+
+
+<script>
+  // existing functions (keep as before), but ensure they also toggle .btn-outline-dark <-> .btn-warning
+  function selectPayment(method, btn) {
+    console.log('ddfdfd')
+    document.getElementById('payment_method').value = method;
+
+    // reset button styles
+    document.querySelectorAll('.btn-group .btn').forEach(b => 
+      b.classList.replace('btn-warning', 'btn-outline-dark')
+    );
+    btn.classList.replace('btn-outline-dark', 'btn-warning');
+
+    document.getElementById('credit_time').style.display = method === 'credit' ? 'block' : 'none';
+
+    document.getElementById('due_date_wrapper').style.display = (method === 'credit') ? 'block' : 'none';
+
+    const bankDropdown = document.getElementById('advance-bank-dropdown');
+    const bankSelect = document.getElementById('advance_bank');
+
+    if (method !== 'cash') {
+    console.log(method)
+
+      bankDropdown.style.display = 'block';
+      bankSelect.setAttribute('required', 'required');
+    } else {
+    console.log(method)
+
+      bankDropdown.style.display = 'none';
+      bankSelect.removeAttribute('required');
+      bankSelect.value = ""; // reset when hidden
+    }
+
+      if (method === 'credit') {
+    const advanceCashBtn = document.querySelector(
+      "[onclick*=\"selectAdvancePayment('cash'\"]"
+    );
+    if (advanceCashBtn) {
+      advanceCashBtn.click(); // trigger JS + UI update
+    }
+  }
+
+  }
+
+  function selectAdvanceMode(mode, btn) {
+    document.getElementById('advance_mode').value = mode;
+    document.querySelectorAll("[onclick^='selectAdvanceMode']").forEach(b => {
+      b.classList.remove('btn-warning');
+      b.classList.add('btn-outline-dark');
+    });
+    btn.classList.remove('btn-outline-dark');
+    btn.classList.add('btn-warning');
+  }
+
+  // Run on page load to ensure UI matches values coming from server
+  document.addEventListener('DOMContentLoaded', function () {
+    var currentPayment = document.getElementById('payment_method').value || 'cash';
+    // find the button for that payment and trigger the same UI changes
+    document.querySelectorAll("[onclick^='selectPayment']").forEach(function (b) {
+      // b.onclick attribute contains call like selectPayment('upi', this) => extract method from attribute
+      var onclick = b.getAttribute('onclick') || '';
+      if (onclick.indexOf("'" + currentPayment + "'") !== -1) {
+        // manually call selectPayment with element to set classes and due date visibility
+        selectPayment(currentPayment, b);
+      }
+    });
+
+    // advance mode
+
+    // if payment is credit and due_date has a value, ensure wrapper visible (extra safety)
+    if (currentPayment === 'credit') {
+      document.getElementById('due_date_wrapper').style.display = 'block';
+    }
+  });
+
+{% comment %}   
+function recalculateTotals() {
+    let totalItems = 0;
+    let totalAmount = 0;
+
+    document.querySelectorAll('.item-row').forEach(row => {
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.rate-input').value) || 0;
+        const amount = qty * price;
+
+        row.querySelector('.amount').value = amount.toFixed(2);
+        totalItems += qty;
+        totalAmount += amount;
+    });
+
+    const discountPercentageField = document.getElementById('discount-percentage');
+    const discountAmountField = document.getElementById('discount-amount-input');
+    const advanceAmountField = document.getElementById('advance_payment_method');
+
+    let discountAmount = 0;
+    let discountPercentage = 0;
+
+    // Two-way discount binding
+    if (document.activeElement === discountPercentageField) {
+        discountPercentage = parseFloat(discountPercentageField.value) || 0;
+        discountAmount = totalAmount * (discountPercentage / 100);
+        discountAmountField.value = discountAmount.toFixed(2);
+    } else if (document.activeElement === discountAmountField) {
+        discountAmount = parseFloat(discountAmountField.value) || 0;
+        discountPercentage = (totalAmount === 0) ? 0 : (discountAmount / totalAmount) * 100;
+        discountPercentageField.value = discountPercentage.toFixed(2);
+    } else {
+        discountPercentage = parseFloat(discountPercentageField.value) || 0;
+        discountAmount = totalAmount * (discountPercentage / 100);
+        discountAmountField.value = discountAmount.toFixed(2);
+    }
+
+    const amountAfterDiscount = totalAmount - discountAmount;
+    const advanceAmount = parseFloat(advanceAmountField.value) || 0;
+    const netPayable = amountAfterDiscount - advanceAmount;
+
+    // Update summary
+    document.getElementById('total-items').innerText = totalItems;
+    document.getElementById('total-amount-before-discount').innerText = totalAmount.toFixed(2);
+    document.getElementById('discount-amount').innerText = discountAmount.toFixed(2);
+    document.getElementById('total-amount').innerText = amountAfterDiscount.toFixed(2);
+
+    // New: update advance and net payable
+    document.getElementById('advance-amount').innerText = advanceAmount.toFixed(2);
+
+    const mode = document.getElementById('advance_payment_method').value;
+    document.getElementById('advance-mode').innerText = mode.charAt(0).toUpperCase() + mode.slice(1);
+
+    const bankSelect = document.getElementById('advance_bank');
+    if (mode === 'bank' && bankSelect && bankSelect.value) {
+        document.getElementById('advance-bank-name').style.display = 'inline';
+        document.getElementById('advance-bank-name').innerText = `(${bankSelect.options[bankSelect.selectedIndex].text})`;
+    } else {
+        document.getElementById('advance-bank-name').style.display = 'none';
+    }
+
+    document.getElementById('net-payable').innerText = netPayable.toFixed(2);
+} {% endcomment %}
+
+
+
+function selectAdvancePayment(method, btn) {
+    // Update hidden field
+    document.getElementById('advance_payment_method').value = method;
+
+    // Toggle active button styling
+    btn.closest('.btn-group').querySelectorAll('button').forEach(b => {
+        b.classList.remove('btn-warning');
+        b.classList.add('btn-outline-dark');
+    });
+    btn.classList.remove('btn-outline-dark');
+    btn.classList.add('btn-warning');
+
+    // Show/hide bank dropdown
+    if (method === 'bank') {
+        document.getElementById('advance-bank-dropdown').style.display = 'block';
+        
+    } else {
+        document.getElementById('advance-bank-dropdown').style.display = 'none';
+        document.getElementById('advance_bank').value = ''; // clear bank
+    }
+
+
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const method = document.getElementById('advance_payment_method').value;
+    const btn = document.querySelector(`[onclick="selectAdvancePayment('${method}', this)"]`);
+    if (btn) selectAdvancePayment(method, btn);
+});
+
+
+
+
+</script>
+
+
+      
+
+{% endblock extra_js %}

@@ -1,0 +1,36 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Create Category{% endblock title %}
+{% block content %}
+
+
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- start page title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">Delivery Management</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div class="form-container">
+
+                    <div class="list-group">
+                        {% comment %} <a href="{% url 'auto_assign_delivery' %}" class="list-group-item list-group-item-action">Assign Instant delivery to partners</a> {% endcomment %}
+                        <a href="{% url 'manage_delivery_boy' %}" class="list-group-item list-group-item-action">Manage Own Delivery Boy</a>
+                        {% comment %} <a href="{% url 'shiprocket_general_delivery' %}" class="list-group-item list-group-item-action">ShipRocket for General Delivery</a> {% endcomment %}
+                        <a href="{% url 'delivery_settings' %}" class="list-group-item list-group-item-action">Delivery settings</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+{% endblock %}
+
+

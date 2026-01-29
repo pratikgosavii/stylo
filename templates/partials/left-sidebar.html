@@ -1,0 +1,640 @@
+{% load static %}
+
+
+{% block extra_css %}
+
+<style>
+.search-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+#sidebar-search {
+    width: 100%;
+    padding-right: 30px; /* space for clear button */
+}
+
+.clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    display: none; /* hidden until typing */
+}
+</style>
+
+
+
+
+
+
+{% endblock extra_css %}
+
+
+{% block left_sidebar %}
+        <!-- ========== Left Sidebar Start ========== -->
+        <div class="vertical-menu">
+            <div data-simplebar class="h-100">
+
+
+                <div class="d-flex flex-wrap justify-content-around my-3 px-2">
+
+                <a href="{% url 'create-sale' %}" class="text-center text-decoration-none m-2">
+                    <div class="border rounded p-3 shadow-sm" style="width: 80px; color: black;">
+                    <i data-feather="shopping-bag" style="width: 24px; height: 24px;"></i>
+                    <div class="small mt-1">Sale & POS</div>
+                    </div>
+                </a>
+
+                <a href="{% url 'add_purchase' %}" class="text-center text-decoration-none m-2">
+                    <div class="border rounded p-3 shadow-sm" style="width: 80px; color: black;">
+                    <i data-feather="shopping-cart" style="width: 24px; height: 24px;"></i>
+                    <div class="small mt-1">Purchases</div>
+                    </div>
+                </a>
+
+                <a href="{% url 'add_expense' %}" class="text-center text-decoration-none m-2">
+                    <div class="border rounded p-3 shadow-sm" style="width: 80px; color: black;">
+                    <i data-feather="file-text" style="width: 24px; height: 24px;"></i>
+                    <div class="small mt-1">Expenses</div>
+                    </div>
+                </a>
+
+                <a href="" class="text-center text-decoration-none m-2">
+                    <div class="border rounded p-3 shadow-sm" style="width: 80px; color: black;">
+                    <i data-feather="dollar-sign" style="width: 24px; height: 24px;"></i>
+                    <div class="small mt-1">Payments</div>
+                    </div>
+                </a>
+
+                </div>
+
+
+
+                <!--- Sidemenu -->
+                <div id="sidebar-menu">
+                    <!-- Left Menu Start -->
+                    <ul class="metismenu list-unstyled" id="side-menu">
+
+                        <div class="search-container px-3 py-2">
+                            <input type="text" id="sidebar-search" class="form-control"  onkeyup="filterSidebar()" placeholder="Search menu...">
+                            <button class="clear-btn" onclick="clearSidebarSearch()">×</button>
+                        </div>
+                        
+
+                        {% if request.user.is_superuser %}
+
+                        <li>
+                            <a href="{% url 'dashboard' %}">
+                                <i data-feather="home"></i>
+                                <span class="badge rounded-pill text-success float-end">9+</span>
+                                <span data-key="t-dashboard">Admin Dashboard</span>
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Catalogue</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_super_catalogue' %}">Add Catalogue</a></li>
+                                <li><a href="{% url 'list_super_catalogue' %}">Catalogue List</a></li>
+                            </ul>
+                        </li> 
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Product</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+
+                               
+                                <!-- Product Category -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">Main Category</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_product_main_category' %}">Add Main Category</a></li>
+                                        <li><a href="{% url 'list_product_main_category' %}">Main Category List</a></li>
+                                    </ul>
+                                </li>
+
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">Category</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_product_category' %}">Add Category</a></li>
+                                        <li><a href="{% url 'list_product_category' %}">Category List</a></li>
+                                    </ul>
+                                </li>
+
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">SubCategory</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_product_subcategory' %}">Add SubCategory</a></li>
+                                        <li><a href="{% url 'list_product_subcategory' %}">SubCategory List</a></li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">Size</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_size' %}">Add Size</a></li>
+                                        <li><a href="{% url 'list_size' %}">Size List</a></li>
+                                    </ul>
+                                </li>
+                            
+                            </ul>
+                        </li>
+                        
+ <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <i data-feather="layers"></i>
+                                        <span data-key="t-authentication">Expense Category</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_expense_category' %}">Add Expense Category</a></li>
+                                        <li><a href="{% url 'list_expense_category' %}">Expense List</a></li>
+                                    </ul>
+                                </li> 
+
+
+                              
+                        <li>
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow">
+                                    <i data-feather="layers"></i>
+                                    <span data-key="t-authentication">Coupon</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="{% url 'add_coupon' %}">Add Coupon</a></li>
+                                    <li><a href="{% url 'list_coupon' %}">Coupon List</a></li>
+                                </ul>
+                            </li>
+                        <li>
+
+                              
+                        <li>
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow">
+                                    <i data-feather="layers"></i>
+                                    <span data-key="t-authentication">Pincode</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="{% url 'add_pincode' %}">Add Pincode</a></li>
+                                    <li><a href="{% url 'list_pincode' %}">Pincode List</a></li>
+                                </ul>
+                            </li>
+                        <li>
+
+                        <li>
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow">
+                                    <i data-feather="layers"></i>
+                                    <span data-key="t-authentication">State</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="{% url 'add_state' %}">Add State</a></li>
+                                    <li><a href="{% url 'list_state' %}">State List</a></li>
+                                </ul>
+                            </li>
+                        <li>
+
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Event</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_event' %}">Event Add</a></li>
+                                <li><a href="{% url 'list_event' %}">Event List</a></li>
+
+                            </ul>
+                        </li>
+                        <li>
+                            <li>
+                                <a href="javascript: void(0);" class="has-arrow">
+                                    <i data-feather="layers"></i>
+                                    <span data-key="t-authentication">Testimonials</span>
+                                </a>
+                                <ul class="sub-menu" aria-expanded="false">
+                                    <li><a href="{% url 'add_testimonials' %}">Add Testimonials</a></li>
+                                    <li><a href="{% url 'list_testimonials' %}">Testimonials List</a></li>
+                                </ul>
+                            </li>
+                        <li>
+
+                             
+                      <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Banner</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_home_banner' %}">Banner Add</a></li>
+                                <li><a href="{% url 'list_home_banner' %}">Banner List</a></li>
+                                <li><a href="{% url 'vendor_list_bannercampaign' %}">Vendor Banner List</a></li>
+
+                            </ul>
+                        </li>
+
+                         {% comment %} <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">User Management (next phase) </span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                
+                                <!-- Manage Role -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <span>Manage Role</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'role_create' %}">Add Role</a></li>
+                                        <li><a href="{% url 'role_list' %}">Role List</a></li>
+                                    </ul>
+                                </li>
+
+                                <!-- Manage User -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <span>Manage User</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_user_with_roles' %}">Add User</a></li>
+                                        <li><a href="{% url 'role_list' %}">User List</a></li>
+                                    </ul>
+                                </li>
+
+                            </ul>
+                        </li> {% endcomment %}
+
+                        
+                        <li>
+                            <a href="{% url 'list_notification_campaigns' %}">
+                                <i data-feather="bell"></i>
+                                <span data-key="t-notifications">Notification Campaigns</span>
+                            </a>
+                        </li>
+                                            
+                                            
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Payments</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a>Recent Payments</a></li>
+                                <li><a>Initiate Refunds</a></li>
+                                <li><a>Refunds</a></li>
+                                <li><a>Payment Reports</a></li>
+                            </ul>
+                        </li>
+
+
+
+                        {% endif %}
+
+                        {% if user.is_vendor %}
+
+                   
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Company Profile</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_company_profile' %}">Add Company Profile</a></li>
+                                <li><a href="{% url 'list_company_profile' %}">Company Profile List</a></li>
+                            </ul>
+                        <li>
+
+                            <li>
+                                <a href="{% url 'daybook_report' %}" class="has-arrow">
+                                    <i data-feather="layers"></i>
+                                    <span data-key="t-authentication">Day Book</span>
+                                </a>
+                            </li>
+                   
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Product</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+
+                               
+                                <!-- Addon -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">Addon</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_addon' %}">Add Addon</a></li>
+                                        <li><a href="{% url 'list_addon' %}">Addon List</a></li>
+                                    </ul>
+                                </li>
+
+                                <!-- Product -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">Product</a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_product' %}">Add Product</a></li>
+                                        <li><a href="{% url 'list_product' %}">Product List</a></li>
+                                    </ul>
+                                </li>
+
+                             
+
+                               <li>
+                                    <a href="{% url 'generate_barcode' %}">
+                                        <i data-feather="layers"></i>
+                                        <span>Generate Barcode</span>
+                                    </a>
+                                </li>
+                               <li>
+                                    <a href="{% url 'product_settings' %}">
+                                        <i data-feather="settings"></i>
+                                        <span>Product Settings</span>
+                                    </a>
+                                </li>
+                               <li>
+                                    <a href="{% url 'barcode_setting' %}">
+                                        <i data-feather="settings"></i>
+                                        <span>Barcode Settings</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Purchase</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+
+                                <!-- Product Category -->
+
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <i data-feather="layers"></i>
+                                        <span data-key="t-authentication">Manage Vendor</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_vendor' %}">Add Vendor</a></li>
+                                        <li><a href="{% url 'list_vendor' %}">Vendor List</a></li>
+                                    </ul>
+                                </li> 
+
+
+
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <i data-feather="layers"></i>
+                                        <span data-key="t-authentication">Purchase</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_purchase' %}">Add Purchase</a></li>
+                                        <li><a href="{% url 'list_purchase' %}">Purchase List</a></li>
+                                    </ul>
+                                </li> 
+                            </ul> 
+                        </li> 
+
+
+                       
+ 
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">POS</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                               <li><a href="{% url 'create-sale' %}">Add Sale</a></li>
+                                        <li><a href="{% url 'list_sale' %}">Sale List</a></li>
+                            </ul>
+                        </li> 
+
+
+
+                      
+
+                      
+
+                                
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Expense</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+
+                                <!-- Product Category -->
+
+                               
+                                <li><a href="{% url 'add_expense' %}">Add Expense</a></li>
+                                <li><a href="{% url 'list_expense' %}">Expense List</a></li>
+                            </ul> 
+                        </li> 
+
+
+                        
+                       
+                       
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Payments</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+
+                                <!-- Product Category -->
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <i data-feather="layers"></i>
+                                        <span data-key="t-authentication">Manage Customer</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_customer' %}">Add Customer</a></li>
+                                        <li><a href="{% url 'add_customer' %}">Customer List</a></li>
+                                    </ul>
+                                </li> 
+
+                                <li>
+                                    <a href="javascript: void(0);" class="has-arrow">
+                                        <i data-feather="layers"></i>
+                                        <span data-key="t-authentication">Payments</span>
+                                    </a>
+                                    <ul class="sub-menu" aria-expanded="false">
+                                        <li><a href="{% url 'add_payment' %}">Add Payments</a></li>
+                                        <li><a href="{% url 'list_payment' %}">Payments List</a></li>
+                                    </ul>
+                                </li> 
+                            </ul> 
+                        </li> 
+
+                         
+
+                        <li class="menu-item-has-children">
+                            <a href="javascript:void(0);"  class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Order Management</span>
+                            </a>
+                            <ul class="sub-menu">
+                                <li>
+                                    <a href="{% url 'order_list' %}">
+                                        <span>Orders List</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'order_exchange_list' %}">
+                                        <span>Return / Exchange Requests</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+
+                       
+
+
+                        <li>
+                            <a href="{% url 'list_stock' %}" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">List Stock</span>
+                            </a>
+                        </li>
+
+
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Bank Account</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_bank' %}">Add Bank</a></li>
+                                <li><a href="{% url 'list_bank' %}">Bank List</a></li>
+                            </ul>
+                        </li> 
+
+                          <li>
+                            <a href="{% url 'cash_in_hand' %}">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Cash In Hand</span>
+                            </a>
+                        </li>
+
+
+                       
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Banner</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'add_bannercampaign' %}">Banner Add</a></li>
+                                <li><a href="{% url 'list_bannercampaign' %}">Banner List</a></li>
+
+                            </ul>
+                            
+                        </li>
+
+
+                        <li>
+                            <a href="javascript: void(0);" class="has-arrow">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Store Setting</span>
+                            </a>
+                            <ul class="sub-menu" aria-expanded="false">
+                                <li><a href="{% url 'online_store_setting' %}">Online Store Setting</a></li>
+                                <li><a href="{% url 'store_hours' %}">Store Hours</a></li>
+
+                                {% comment %} <li><a href="{% url 'list_company_profile' %}">Company Profile List</a></li> {% endcomment %}
+                            </ul>
+                        </li>
+                    
+
+                          <li>
+                            <a href="{% url 'invoice_setting' %}">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Invoice Settings</span>
+                            </a>
+                        </li>
+
+                          <li>
+                            <a href="{% url 'tax_setting' %}">
+                                <i data-feather="layers"></i>
+                                <span data-key="t-authentication">Tax Settings</span>
+                            </a>
+                        </li>
+
+                       {% endif %}
+                       
+                        <div style="margin: 100% 0 0 35%; align-content: center">
+                            <form method="POST" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary" style="background-color: #775599;" >Logout</button>
+                        </form>
+                        </div>
+                    </ul>
+
+                </div>
+                <!-- Sidebar -->
+            </div>
+        </div>
+        <!-- Left Sidebar End -->
+{% endblock left_sidebar %}
+
+{% block extra_js %}
+
+
+<script>
+
+
+function filterSidebar() {
+    var input = document.getElementById("sidebar-search");
+    var filter = input.value.toLowerCase();
+    var ul = document.getElementById("side-menu");
+    var li = ul.getElementsByTagName("li");
+    var clearBtn = document.querySelector(".clear-btn");
+
+    // toggle clear button
+    clearBtn.style.display = filter ? "block" : "none";
+
+    for (var i = 0; i < li.length; i++) {
+        var aTags = li[i].getElementsByTagName("a");
+        var matchFound = false;
+
+        for (var j = 0; j < aTags.length; j++) {
+            var txtValue = aTags[j].textContent || aTags[j].innerText;
+            if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                matchFound = true;
+                break;
+            }
+        }
+
+        li[i].style.display = matchFound ? "" : "none";
+    }
+}
+
+function clearSidebarSearch() {
+    var input = document.getElementById("sidebar-search");
+    input.value = "";
+    document.querySelector(".clear-btn").style.display = "none";
+    filterSidebar(); // reset menu
+}
+
+
+</script>
+
+
+
+{% endblock extra_js %}

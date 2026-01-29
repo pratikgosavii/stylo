@@ -1,0 +1,126 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Login Page</title>
+    <!-- Bootstrap CSS -->
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+    />
+
+    <style>
+        body {
+            background-color: #ffdb8a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .logo img {
+            width: 100px;
+            margin-bottom: 8px;
+        }
+
+        .btn-purple {
+            background-color: #ffdb8a;
+            color: #fff;
+        }
+
+        .btn-purple:hover {
+            background-color: #ffdb8a;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .register-link a {
+            color: #291a4a;
+            text-decoration: none;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    {% if form.errors %}
+        <div class="alert alert-danger mt-3">
+            <ul>
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <div class="logo">
+        <img src="{% static 'images/svindo_logo.png' %}" alt="Logo"/>
+    </div>
+    <h4 class="text-center mb-4">Vendor Login</h4>
+    <form action="" method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="email" class="form-label">Mobile</label>
+            <input
+                    type="number"
+                    class="form-control"
+                    id="mobile"
+                    value="{{ mobile|default:'' }}"
+                    name="mobile"
+                    placeholder="Enter your mobile"
+                    required
+            />
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input
+                    type="password"
+                    class="form-control"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    required
+            />
+        </div>
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <button type="submit" class="btn btn-purple w-100" style="color:black;">Login</button>
+    </form>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

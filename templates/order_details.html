@@ -1,0 +1,244 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Create Customer{% endblock title %}
+
+{% block extra_css %}
+    <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet" type="text/css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <style>
+        body {
+            background-color: #f0d28c;
+            padding-bottom: 20px;
+        }
+
+        .form-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-heading {
+            text-align: left;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 2rem;
+            color: #ffdb8a;
+        }
+
+        .btn-primary {
+            background-color: #775599;
+            border-color: #775599;
+        }
+
+        .custom-button {
+            width: 150px;
+        }
+    </style>
+
+    <style>
+        body {
+            background-color: #f7f9fc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            border-radius: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+        .order-status {
+            color: red;
+            font-weight: bold;
+        }
+        .bill-button, .accept-button {
+            border-radius: 30px;
+        }
+        .accept-button {
+            background-color: #f0a500;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+        }
+        .accept-button:hover {
+            background-color: #d18d00;
+        }
+        .product-img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .price-old {
+            text-decoration: line-through;
+            color: red;
+            font-size: 0.9rem;
+        }
+        .price-new {
+            color: black;
+            font-weight: bold;
+        }
+        .section-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        .btn-call {
+            background-color: #28a745;
+            color: white;
+        }
+    </style>
+    
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+</head>
+
+
+{% endblock extra_css %}
+
+{% block content %}
+
+
+
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">{{ title }}</h4>
+                    </div>
+                </div>
+            </div>
+                        
+            <div class="container my-4">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4>Customer Name:- {{ data.customer_name }}</h4>
+                        <button class="btn btn-danger">Cancel</button>
+                    </div>
+                    <p class="order-status">{{ data.get_status_display  }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-0">Id - # {{ data.order_id }}</p>
+                            <small>{{ data.created_at }}</small>
+                            <p class="text-primary">Self Pickup</p>
+                            <span class="text-danger">
+                                {% if data.is_paid %}
+                            Paid / {{ data.payment_mode }}
+                        {% else %}
+                            Unpaid / {{ data.payment_mode|default:"COD" }}
+                        {% endif %}
+                            </span>
+
+                            
+                        </div>
+                        <button class="btn btn-warning bill-button">Download Bill</button>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                       <div class="section-title">{{ data.items.all|length }} Items in this Order</div>
+
+                        {% for item in data.items.all %}
+    <div class="d-flex mb-3 align-items-center">
+        {% if item.product.image %}
+            <img src="{{ item.product.image.url }}" alt="Product" class="product-img me-3">
+        {% else %}
+            <img src="{% static 'images/default-product.png' %}" alt="No Image" class="product-img me-3">
+        {% endif %}
+
+        <div class="flex-grow-1">
+            <p class="mb-0">{{ item.product.name }}</p>
+            <small>{{ item.product.description|default:"No description" }}<br>click on product icon for further details</small>
+            <p class="mb-0 mt-1">
+                <span class="price-new">Rs. {{ item.price }}</span>
+            </p>
+
+            <!-- Status Update Form -->
+            {% if item.status == 'intransit' or item.status == 'delivered' or item.status == 'pending' %}
+                <form action="{% url 'update_order_item_status' item.id %}" method="post" class="mt-2 d-flex align-items-center">
+                    {% csrf_token %}
+                    <select name="status" class="form-select me-2" style="width: 150px;">
+                        <option value="intransit" {% if item.status == 'intransit' %}selected{% endif %}>In Transit</option>
+                        <option value="delivered" {% if item.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                </form>
+            {% else %}
+                <span class="badge bg-secondary">{{ item.get_status_display }}</span>
+            {% endif %}
+
+
+        </div>
+    </div>
+{% endfor %}
+
+
+
+
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="section-title">Payment Details</div>
+                        <ul class="list-unstyled">
+                            <li>Item Total & GST: <strong>Rs {{ data.item_total }}</strong></li>
+                            <li>Shipping Fee: <strong>Rs {{ data.shipping_fee }}</strong></li>
+                            <li>Wallet Amount: <strong>Rs {{ data.wallet_amount }}</strong></li>
+                            <li>Cashback: <strong>Rs {{ data.cashback }}</strong></li>
+                            <li>Coupon: <strong>Rs {{ data.coupon }}</strong></li>
+                            <li class="mt-2">Total Amount: <strong class="text-primary">Rs {{ data.total_amount }}</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="section-title">Delivery Details</div>
+                        <p class="mb-0">Address: <strong>{{ data.address.full_address }}</strong></p>
+<p class="mb-0">Mobile: <strong>{{ data.address.mobile_number }}</strong></p>
+                            {% comment %} <button class="btn btn-sm btn-call ms-2">Call</button> {% endcomment %}
+                        </p>
+                        <p class="mb-0">Payment Mode: <strong>{{ data.payment_mode }}</strong></p>
+                    </div>
+                    
+                    {% if data.status != "accepted" %}
+
+                    <div class="text-center my-4">
+                      <a href="{% url 'accept_order' data.id %}">  <button class="accept-button w-100">Accept Order</button> </a>
+                    </div>
+
+                    {% endif %}
+
+                    {% if request.user.delivery_mode.is_self_delivery_enabled == "True" %}
+                        <div class="mb-2">
+                            <form action="{% url 'assign_delivery_boy' data.id %}" method="post">
+                                {% csrf_token %}
+                                <div class="section-title">Delivery Boy  </div>
+                                <div class="input-group">
+                                    <select name="delivery_boy_id" class="form-select">
+                                        <option selected>Select delivery boy</option>
+                                        {% for i in delivery_boy_data %}
+                                            <option value="{{ i.id }}" {% if i.id == data.delivery_boy_id %}selected{% endif %}>{{ i.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-success">Assign</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock content %}
+
+{% block extra_js %}
+
+{% endblock extra_js %}

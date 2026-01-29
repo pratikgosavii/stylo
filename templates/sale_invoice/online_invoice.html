@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tax Invoice</title>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #000; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { border: 1px solid #000; padding: 5px; vertical-align: top; }
+    th { background-color: #f0f0f0; text-align: center; }
+    .no-border td, .no-border th { border: none; }
+    .header-logo img { width: 150px; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .bold { font-weight: bold; }
+    .section-title { background: #eee; padding: 4px; font-weight: bold; }
+    .amount-in-words { font-style: italic; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<table class="no-border">
+    <tr>
+        <td class="header-logo"><img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon Logo"></td>
+        <td class="text-right">
+            <h3>Tax Invoice/Bill of Supply/Cash Memo</h3>
+            <p>(Original for Recipient)</p>
+        </td>
+    </tr>
+</table>
+
+<!-- Seller & Buyer Info -->
+<table>
+    <tr>
+        <td width="50%">
+            <div class="section-title">Sold By :</div>
+            <p><b>{{ sale_instance.company_profile.name }}</b><br>
+            {{ sale_instance.company_profile.address }}<br>
+            PAN No: {{ sale_instance.company_profile.pan }}<br>
+            GST Registration No: {{ sale_instance.company_profile.gstin }}</p>
+        </td>
+        <td width="50%">
+            <div class="section-title">Billing Address :</div>
+            <p><b>{{ sale_instance.customer.name }}</b><br>
+            {{ sale_instance.customer.billing_address }}<br>
+            State/UT Code: {{ sale_instance.customer.state_code }}</p>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="section-title">Order Info :</div>
+            <p>
+                Order Number: {{ sale_instance.order_number }}<br>
+                Order Date: {{ sale_instance.created_at|date:"d.m.Y" }}
+            </p>
+        </td>
+        <td>
+            <div class="section-title">Shipping Address :</div>
+            <p><b>{{ sale_instance.customer.name }}</b><br>
+            {{ sale_instance.customer.shipping_address }}<br>
+            State/UT Code: {{ sale_instance.customer.state_code }}</p>
+        </td>
+    </tr>
+</table>
+
+<!-- Place and Invoice Info -->
+<table>
+    <tr>
+        <td>
+            <b>Place of Supply:</b> {{ sale_instance.company_profile.state }}<br>
+            <b>Place of Delivery:</b> {{ sale_instance.customer.state }}
+        </td>
+        <td>
+            <b>Invoice Number:</b> {{ sale_instance.invoice_number }}<br>
+            <b>Invoice Date:</b> {{ sale_instance.created_at|date:"d.m.Y" }}
+        </td>
+    </tr>
+</table>
+
+<!-- Items Table -->
+<table>
+    <tr>
+        <th>SL No.</th>
+        <th>Description</th>
+        <th>Unit Price</th>
+        <th>Qty</th>
+        <th>Net Amount</th>
+        <th>Tax Rate</th>
+        <th>Tax Type</th>
+        <th>Tax Amount</th>
+        <th>Total Amount</th>
+    </tr>
+
+    {% for item in sale_instance.items.all %}
+    <tr>
+        <td class="text-center">{{ forloop.counter }}</td>
+        <td>{{ item.product.name }}<br>HSN: {{ item.product.hsn }}</td>
+        <td class="text-right">{{ item.price|floatformat:2 }}</td>
+        <td class="text-center">{{ item.quantity }}</td>
+        <td class="text-right">{{ item.amount|floatformat:2 }}</td>
+        <td class="text-center">{{ item.product.cgst_rate }}% + {{ item.product.sgst_rate }}%</td>
+        <td class="text-center">CGST/SGST</td>
+        <td class="text-right">{{ item.tax_amount|floatformat:2 }}</td>
+        <td class="text-right">{{ item.total|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+
+    {% if wholesale.delivery_charges %}
+    <tr>
+        <td class="text-center">-</td>
+        <td>Shipping Charges</td>
+        <td colspan="5"></td>
+        <td class="text-right">{{ wholesale.delivery_charges|floatformat:2 }}</td>
+        <td class="text-right">{{ wholesale.delivery_charges|floatformat:2 }}</td>
+    </tr>
+    {% endif %}
+
+    <tr>
+        <td colspan="8" class="text-right bold">TOTAL:</td>
+        <td class="text-right bold">{{ rounded_total|floatformat:2 }}</td>
+    </tr>
+</table>
+
+<!-- Total in words -->
+<p class="amount-in-words">Amount in Words: <b>{{ total_in_words }}</b></p>
+
+<!-- Footer -->
+<table class="no-border">
+    <tr>
+        <td>
+            Whether tax is payable under reverse charge - <b>No</b><br><br>
+            Payment Transaction ID: {{ sale_instance.transaction_id }}<br>
+            Date & Time: {{ sale_instance.created_at|date:"d/m/Y, H:i:s" }}<br>
+            Invoice Value: {{ rounded_total }}<br>
+            Mode of Payment: {{ sale_instance.payment_mode }}
+        </td>
+        <td class="text-right">

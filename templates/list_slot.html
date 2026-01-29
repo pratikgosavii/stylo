@@ -1,0 +1,175 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Categories List{% endblock title %}
+
+
+{% block extra_css %}
+    <!-- plugin css -->
+    <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet"
+          type="text/css"/>
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+    />
+    <style>
+        body {
+            background-color: gainsboro;
+            color: #775599;;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background-color: #775599;;
+            color: #ffffff;
+            border-radius: 8px 8px 0 0;
+            padding: 20px;
+        }
+
+        .card-title {
+            margin: 0;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .table thead {
+            background-color: gray;
+            color: white;
+        }
+
+        .table tbody tr {
+            background-color: white;
+            color: black;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f0d28c;
+            color: #775599;;
+        }
+
+        .status-approved {
+            color: rgb(80, 244, 80);
+            font-weight: bold;
+        }
+
+        .status-pending {
+            color: blue;
+            font-weight: bold;
+        }
+
+        .status-not-approved {
+            color: red;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .table-responsive {
+                overflow-x: auto;
+            }
+        }
+    </style>
+{% endblock extra_css %}
+
+{% block content %}
+
+    <!-- ============================================================== -->
+    <!-- Start right Content here -->
+    <!-- ============================================================== -->
+    <div class="main-content">
+        <div class="page-content">
+            <div class="container-fluid">
+                <!-- start page title -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                            <h4 class="mb-sm-0 font-size-18">List Slots</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table
+                                                id="datatable"
+                                                class="table table-bordered table-striped"
+                                        >
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Slot Start</th> 
+                                                    <th>Slot End</th> 
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tableBody">
+                                                {% if data %}
+                                                    {% for i in data %}
+                                                        <tr>
+                                                            <td>{{ forloop.counter }}</td>
+                                                            <td>{{ i.start }}</td>
+                                                            <td>{{ i.end }}</td>
+                                                            </td>
+                                                    <td>
+                                                        <!-- remove Button -->
+                                                        <a href="{% url 'update_slot' i.id %}" ><i class="bi bi-pencil-square text-primary action-icons edit"  title="Edit"></i>  </a>
+                                                        <a href="{% url 'delete_slot' i.id %}" > <i class="bi bi-trash text-danger action-icons delete" title="Delete"></i> </a>
+
+
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                            {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- container-fluid -->
+        </div>
+        <!-- End Page-content -->
+
+        {% block footer %}
+            {% include 'partials/footer.html' %}
+        {% endblock footer %}
+    </div>
+    <!-- end main content-->
+{% endblock content %}
+
+{% block extra_js %}
+    <script>
+        // Auto-hide toast after 5 seconds
+        setTimeout(() => {
+            const toastElement = document.getElementById("toast");
+            if (toastElement) {
+                toastElement.classList.remove("show"); // Hide toast
+                setTimeout(() => {
+                    toastElement.remove(); // Remove from DOM
+                }, 500); // Wait for fade-out animation
+            }
+        }, 5000);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Plugins js-->
+    <script src="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.min.js' %}"></script>
+    <script src="{% static 'libs/admin-resources/jquery.vectormap/maps/jquery-jvectormap-world-mill-en.js' %}"></script>
+    <script src="{% static 'js/pages/allchart.js' %}"></script>
+    <!-- dashboard init -->
+    <script src="{% static 'js/pages/dashboard.init.js' %}"></script>
+
+{% endblock extra_js %}

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quotation Invoice - INV001</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #000;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 5px;
+      text-align: center;
+    }
+    .no-border td, .no-border th {
+      border: none !important;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 5px;
+    }
+    .header-left {
+      text-align: left;
+    }
+    .header-right {
+      text-align: right;
+    }
+    .section {
+      margin-top: 8px;
+      border: 1px solid #000;
+      padding: 4px;
+    }
+    .signature {
+      margin-top: 40px;
+      text-align: right;
+      font-weight: bold;
+    }
+    .small-text {
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    {% if sale_instance.company_profile and sale_instance.company_profile.profile_image %}
+    <img src="{{ sale_instance.company_profile.profile_image.url }}" width="60"><br>
+    {% endif %}
+    <strong>{{ sale_instance.company_profile.company_name|default:sale_instance.company_profile.brand_name }}</strong><br>
+    {% if sale_instance.company_profile.address_line_1 %}{{ sale_instance.company_profile.address_line_1 }}<br>{% endif %}
+    {% if sale_instance.company_profile.address_line_2 %}{{ sale_instance.company_profile.address_line_2 }}<br>{% endif %}
+    GSTIN : {{ sale_instance.company_profile.gstin|default:"-" }} | PAN : {{ sale_instance.company_profile.pan|default:"-" }}<br>
+    Mobile : {{ sale_instance.company_profile.contact|default:"-" }} | Email : {{ sale_instance.company_profile.email|default:"-" }}
+  </div>
+  <div class="header-right">
+    <h3 style="color:blue; margin:0;">QUOTATION</h3>
+    <p><strong>Original for Recipient</strong></p>
+    Quotation Date : {{ wholesale.date|default:sale_instance.created_at|date:"d/m/Y" }} <br>
+    Invoice No. : {{ wholesale.invoice_number }}
+  </div>
+</div>
+
+<!-- Customer Details -->
+<table class="section">
+  <tr>
+    <td width="40%">
+      <strong>Customer Details:</strong><br>
+      {{ sale_instance.customer.company_name|default:sale_instance.customer.name }}<br>
+      GSTIN : {{ sale_instance.customer.gst_number|default:"-" }}<br>
+      PAN : {{ sale_instance.customer.pan_number|default:"-" }}<br>
+      Aadhar : {{ sale_instance.customer.aadhar_number|default:"-" }}<br>
+      Ph : {{ sale_instance.customer.contact|default:"-" }}
+    </td>
+    <td width="30%">
+      <strong>Billing Address :</strong><br>
+      {% if sale_instance.customer.billing_address_line1 %}{{ sale_instance.customer.billing_address_line1 }}<br>{% endif %}<br>
+      <strong>Delivery Address :</strong><br>
+      {% if sale_instance.customer.dispatch_address_line1 %}{{ sale_instance.customer.dispatch_address_line1 }}{% endif %}
+    </td>
+    <td width="30%">
+      <strong>Reference :</strong> {{ wholesale.references|default:"-" }}
+    </td>
+  </tr>
+</table>
+
+<!-- Items Table -->
+<table>
+  <thead>
+    <tr>
+      <th>S.No.</th>
+      <th>Item</th>
+      <th>HSN/SAC</th>
+      <th>Rate</th>
+      <th>Qty Unit</th>
+      <th>Taxable Value</th>
+      <th colspan="2">GST</th>
+      <th>Total</th>
+    </tr>
+    <tr>
+      <th colspan="6"></th>
+      <th>SGST(%)</th>
+      <th>CGST(%)</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in sale_instance.items.all %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ item.product.name }}</td>
+      <td>{{ item.product.hsn|default:"-" }}</td>
+      <td>{{ item.price|floatformat:2 }}</td>
+      <td>{{ item.quantity }} {{ item.product.unit|default:"" }}</td>
+      <td>{{ item.amount|floatformat:2 }}</td>
+      <td>{{ item.product.sgst_rate|default:"0" }}%</td>
+      <td>{{ item.product.cgst_rate|default:"0" }}%</td>
+      <td>{{ item.total_with_tax|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Totals Section -->
+<table class="no-border">
+  <tr>
+    <td width="60%">
+      <strong>Total Quantity :</strong> {{ total_quantity }} <br>
+      <strong>Total value in words :</strong> {{ total_in_words }}
+    </td>
+    <td width="40%">
+      <table>
+        <tr><td>Taxable Amount</td><td>{{ sum_taxable|floatformat:2 }}</td></tr>
+        <tr><td>SGST</td><td>{{ sum_sgst|floatformat:2 }}</td></tr>
+        <tr><td>CGST</td><td>{{ sum_cgst|floatformat:2 }}</td></tr>
+        <tr><td>Discount ({{ discount_percentage|default:"0" }}%)</td><td>{{ discount_amount|floatformat:2 }}</td></tr>
+        <tr><td>Delivery Charges</td><td>{{ wholesale.delivery_charges|default:"0.00" }}</td></tr>
+        <tr><td>Package Charges</td><td>{{ wholesale.packaging_charges|default:"0.00" }}</td></tr>
+        <tr><td>Round off</td><td>{{ round_off_value|floatformat:2 }}</td></tr>
+        <tr><td><strong>Total Amount</strong></td><td><strong>{{ rounded_total|floatformat:2 }}</strong></td></tr>
+        <tr><td>Paid</td><td>{{ paid_amount|floatformat:2 }}</td></tr>
+        <tr><td><strong>Balance</strong></td><td><strong>{{ balance_amount|floatformat:2 }}</strong></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<!-- Bank + QR -->
+<table>
+  <tr>
+    <td width="60%">
+      <strong>Bank Details :</strong><br>
+      Bank : {{ sale_instance.advance_bank.name|default:"-" }}<br>
+      Account No : {{ sale_instance.advance_bank.account_number|default:"-" }}<br>
+      IFSC : {{ sale_instance.advance_bank.ifsc_code|default:"-" }}<br>
+      Branch : {{ sale_instance.advance_bank.branch|default:"-" }}<br>
+      UPI : {{ sale_instance.company_profile.upi_id|default:"-" }}
+    </td>
+    <td width="40%" align="center">
+      {% if sale_instance.company_profile.payment_qr %}
+      <img src="{{ sale_instance.company_profile.payment_qr.url }}" width="100"><br>
+      {% endif %}
+      <small>Pay using UPI</small>
+    </td>
+  </tr>
+</table>
+
+<!-- HSN Summary -->
+<table>
+  <thead>
+    <tr>
+      <th>HSN / SAC</th>
+      <th>Taxable Value</th>
+      <th>SGST(%)</th>
+      <th>Amount</th>
+      <th>CGST(%)</th>
+      <th>Amount</th>
+      <th>Total Tax Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for hsn, data in hsn_summary %}
+    <tr>
+      <td>{{ hsn }}</td>
+      <td>{{ data.taxable_value|floatformat:2 }}</td>
+      <td>{{ data.sgst_rate|default:"0" }}%</td>
+      <td>{{ data.sgst_amount|floatformat:2 }}</td>
+      <td>{{ data.cgst_rate|default:"0" }}%</td>
+      <td>{{ data.cgst_amount|floatformat:2 }}</td>
+      <td>{{ data.total_tax|floatformat:2 }}</td>
+    </tr>
+    {% endfor %}
+    <tr>
+      <td colspan="6"><strong>Total</strong></td>
+      <td><strong>{{ total_tax|floatformat:2 }}</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Notes:</strong> {{ wholesale.notes|default:"-" }}</p>
+<p><strong>Terms & Conditions:</strong><br>{{ wholesale.terms|default:"-" }}</p>
+
+<div class="signature">Authorized Signature</div>
+
+</body>
+</html>

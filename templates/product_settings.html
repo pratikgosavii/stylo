@@ -1,0 +1,410 @@
+{% extends "partials/adminBase.html" %}
+{% load custom_filters %}
+{% load static %}
+
+{% block title %}Create Category{% endblock title %}
+
+
+{% block extra_css %}
+    <!-- plugin css -->
+    <link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet"
+          type="text/css"/>
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+    />
+    <style>
+        body {
+            background-color: #f0d28c;
+            padding-bottom: 20px;
+        }
+
+        .form-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-heading {
+            text-align: left;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 2rem;
+            color: #ffdb8a;
+        }
+
+        .description-box {
+            height: 150px;
+            resize: none;
+        }
+
+        .image-preview {
+            max-height: 100px;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background-color: #775599;;
+            border-color: #775599;;
+        }
+
+        .custom-button {
+            width: 150px;
+        }
+
+         .section-title {
+      font-weight: 600;
+      margin-top: 20px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 5px;
+      color: #f57c00;
+    }
+    .form-switch .form-check-input {
+      width: 3em;
+      height: 1.5em;
+    }
+
+    
+    </style>
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+            <!-- start page title -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                        <h4 class="mb-sm-0 font-size-18">{{ title }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div class="form-container">
+                    <form method="POST"  enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <!-- Category Title Section -->
+                       <!-- Product Fields -->
+
+    <h3>Product  Settings</h3> <br><br>
+
+<div class="row">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="wholesale_price" name="wholesale_price" {% if settings.wholesale_price %}checked{% endif %}>
+                    <label class="form-check-label" for="wholesale_price">Wholesale Price</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="stock" name="stock" {% if settings.stock %}checked{% endif %}>
+                    <label class="form-check-label" for="stock">Stock</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="imei" name="imei" {% if settings.imei %}checked{% endif %}>
+                    <label class="form-check-label" for="imei">IMEI</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="low_stock_alert" name="low_stock_alert" {% if settings.low_stock_alert %}checked{% endif %}>
+                    <label class="form-check-label" for="low_stock_alert">Low Stock Alert</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="category" name="category" {% if settings.category %}checked{% endif %}>
+                    <label class="form-check-label" for="category">Category</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="sub_category" name="sub_category" {% if settings.sub_category %}checked{% endif %}>
+                    <label class="form-check-label" for="sub_category">Sub Category</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="brand_name" name="brand_name" {% if settings.brand_name %}checked{% endif %}>
+                    <label class="form-check-label" for="brand_name">Brand Name</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="color" name="color" {% if settings.color %}checked{% endif %}>
+                    <label class="form-check-label" for="color">Color</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="size" name="size" {% if settings.size %}checked{% endif %}>
+                    <label class="form-check-label" for="size">Size</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="batch_number" name="batch_number" {% if settings.batch_number %}checked{% endif %}>
+                    <label class="form-check-label" for="batch_number">Batch Number</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="expiry_date" name="expiry_date" {% if settings.expiry_date %}checked{% endif %}>
+                    <label class="form-check-label" for="expiry_date">Expiry Date</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="description" name="description" {% if settings.description %}checked{% endif %}>
+                    <label class="form-check-label" for="description">Description</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="image" name="image" {% if settings.image %}checked{% endif %}>
+                    <label class="form-check-label" for="image">Image</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="tax" name="tax" {% if settings.tax %}checked{% endif %}>
+                    <label class="form-check-label" for="tax">Tax</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="food" name="food" {% if settings.food %}checked{% endif %}>
+                    <label class="form-check-label" for="food">Food</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delivery -->
+        <div class="section-title">Delivery Details</div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="instant_delivery" name="instant_delivery" {% if settings.instant_delivery %}checked{% endif %}>
+                    <label class="form-check-label" for="instant_delivery">Instant Delivery</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="self_pickup" name="self_pickup" {% if settings.self_pickup %}checked{% endif %}>
+                    <label class="form-check-label" for="self_pickup">Self Pickup</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="general_delivery" name="general_delivery" {% if settings.general_delivery %}checked{% endif %}>
+                    <label class="form-check-label" for="general_delivery">General Delivery</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="shop_orders" name="shop_orders" {% if settings.shop_orders %}checked{% endif %}>
+                    <label class="form-check-label" for="shop_orders">Shop Orders</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Policies -->
+        <div class="section-title">Policies</div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="return_policy" name="return_policy" {% if settings.return_policy %}checked{% endif %}>
+                    <label class="form-check-label" for="return_policy">Return Policy</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="cod" name="cod" {% if settings.cod %}checked{% endif %}>
+                    <label class="form-check-label" for="cod">Cash on Delivery</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="replacement" name="replacement" {% if settings.replacement %}checked{% endif %}>
+                    <label class="form-check-label" for="replacement">Replacement</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="shop_exchange" name="shop_exchange" {% if settings.shop_exchange %}checked{% endif %}>
+                    <label class="form-check-label" for="shop_exchange">Shop Exchange</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="shop_warranty" name="shop_warranty" {% if settings.shop_warranty %}checked{% endif %}>
+                    <label class="form-check-label" for="shop_warranty">Shop Warranty</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="brand_warranty" name="brand_warranty" {% if settings.brand_warranty %}checked{% endif %}>
+                    <label class="form-check-label" for="brand_warranty">Brand Warranty</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Online Catalog Only -->
+        <div class="section-title">Online Catalog Only</div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="online_catalog_only" name="online_catalog_only" {% if settings.online_catalog_only %}checked{% endif %}>
+            <label class="form-check-label" for="online_catalog_only">Online Catalog Only</label>
+        </div>
+        <small class="text-muted d-block mt-1">
+            Note: Enabling this option will only post a catalog product to your site, where only images and product description are shown to users.
+        </small>
+
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+  </div>
+</div>
+
+                      
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+        <!-- container-fluid -->
+</div>
+    <!-- End Page-content -->
+
+    {% block footer %}
+        {% include 'partials/footer.html' %}
+    {% endblock footer %}
+</div>
+
+{% endblock content %}
+
+
+{% block extra_js %}
+    <!-- apexcharts -->
+    <script src="{% static 'libs/apexcharts/dist/apexcharts.min.js' %}"></script>
+    <script>
+        // Image preview logic
+        document.getElementById("bannerImage").addEventListener("change", function () {
+            const file = this.files[0];
+            const preview = document.getElementById("preview");
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    preview.src = event.target.result;
+                    preview.hidden = false;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = "";
+                preview.hidden = true;
+            }
+        });
+    </script>
+    <script>
+        // Auto-hide toast after 5 seconds
+        setTimeout(() => {
+            const toastElement = document.getElementById("toast");
+            if (toastElement) {
+                toastElement.classList.remove("show"); // Hide toast
+                setTimeout(() => {
+                    toastElement.remove(); // Remove from DOM
+                }, 500); // Wait for fade-out animation
+            }
+        }, 5000);
+    </script>
+
+    <!-- Plugins js-->
+   
+
+    <script>
+
+        
+function displaySelectedImages() {
+    const input = document.getElementById("images");
+    const selectedImagesContainer = document.getElementById("imagesPreview");
+    selectedImagesContainer.innerHTML = ""; // Clear previously displayed images
+
+    Array.from(input.files).forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageDiv = document.createElement("div");
+          imageDiv.style.position = "relative";
+          const img = document.createElement("img");
+          img.src = event.target.result;
+          img.alt = file.name;
+          img.style.width = "100px";
+          img.style.height = "100px";
+          img.style.objectFit = "cover";
+          img.style.border = "1px solid #ddd";
+          img.style.borderRadius = "5px";
+          imageDiv.appendChild(img);
+          selectedImagesContainer.appendChild(imageDiv);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+
+
+    </script>
+
+    <script>
+  const settingsData = {
+    wholesale_price: {{ settings.wholesale_price|yesno:"true,false" }},
+    stock: {{ settings.stock|yesno:"true,false" }},
+    imei: {{ settings.imei|yesno:"true,false" }},
+    low_stock_alert: {{ settings.low_stock_alert|yesno:"true,false" }},
+    category: {{ settings.category|yesno:"true,false" }},
+    sub_category: {{ settings.sub_category|yesno:"true,false" }},
+    brand_name: {{ settings.brand_name|yesno:"true,false" }},
+    color: {{ settings.color|yesno:"true,false" }},
+    size: {{ settings.size|yesno:"true,false" }},
+    batch_number: {{ settings.batch_number|yesno:"true,false" }},
+    expiry_date: {{ settings.expiry_date|yesno:"true,false" }},
+    description: {{ settings.description|yesno:"true,false" }},
+    image: {{ settings.image|yesno:"true,false" }},
+    tax: {{ settings.tax|yesno:"true,false" }},
+    food: {{ settings.food|yesno:"true,false" }},
+    instant_delivery: {{ settings.instant_delivery|yesno:"true,false" }},
+    self_pickup: {{ settings.self_pickup|yesno:"true,false" }},
+    general_delivery: {{ settings.general_delivery|yesno:"true,false" }},
+    return_policy: {{ settings.return_policy|yesno:"true,false" }},
+    cod: {{ settings.cod|yesno:"true,false" }},
+    replacement: {{ settings.replacement|yesno:"true,false" }},
+    shop_exchange: {{ settings.shop_exchange|yesno:"true,false" }},
+    shop_warranty: {{ settings.shop_warranty|yesno:"true,false" }},
+    brand_warranty: {{ settings.brand_warranty|yesno:"true,false" }},
+    online_catalog_only: {{ settings.online_catalog_only|yesno:"true,false" }}
+  };
+</script>
+
+
+
+{% endblock extra_js %}

@@ -1,0 +1,87 @@
+{% extends "partials/adminBase.html" %}
+{% load static %}
+
+{% block title %}Return / Exchange Requests{% endblock title %}
+
+{% block extra_css %}
+<link href="{% static 'libs/admin-resources/jquery.vectormap/jquery-jvectormap-1.2.2.css' %}" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<style>
+    body { background-color: gainsboro; color:#775599; }
+    .card { background:#fff; border:none; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1);}
+    .card-header { background:#775599; color:#fff; border-radius:8px 8px 0 0; padding:20px; }
+    .table thead { background:gray; color:#fff; }
+    .table tbody tr:hover { background:#f0d28c; color:#775599; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-content">
+        <div class="container-fluid">
+
+            <div class="row"><div class="col-12">
+                <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+                    <h4 class="mb-sm-0 font-size-18">Return / Exchange Requests</h4>
+                </div>
+            </div></div>
+
+            <div class="container">
+                <div class="row"><div class="col-12">
+                    <div class="card"><div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Order Item</th>
+                                        <th>User</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Requested On</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% if data %}
+                                    {% for i in data %}
+                                        <tr>
+                                            <td>{{ forloop.counter }}</td>
+                                            <td>{{ i.order_item.product.name }} × {{ i.order_item.quantity }}</td>
+                                            <td>{{ i.user }}</td>
+                                            <td>{{ i.get_type_display }}</td>
+                                            <td>
+                                                <span class="badge {% if i.status == 'approved' %}bg-success
+                                                    {% elif i.status == 'rejected' %}bg-danger
+                                                    {% elif i.status == 'requested' %}bg-warning
+                                                    {% else %}bg-secondary{% endif %}">
+                                                    {{ i.status|capfirst }}
+                                                </span>
+                                            </td>
+                                            <td>{{ i.created_at|date:"d M Y, h:i A" }}</td>
+                                            <td>
+                                                <a href="{% url 'return_detail' i.id %}">
+                                                    <i class="bi bi-eye text-primary"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr><td colspan="7" class="text-center">No requests found.</td></tr>
+                                {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div></div>
+                </div></div>
+            </div>
+
+        </div>
+    </div>
+    {% include 'partials/footer.html' %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock extra_js %}
