@@ -57,13 +57,12 @@ class User(AbstractUser):
      
 
 
-    firebase_uid = models.CharField(max_length=128, unique=True, null=True, blank=True)
-    
     dob = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=6, choices=GENDER_CHOICES, null=True, blank=True)
     address = models.CharField(max_length=225, null=True, blank=True)
     profile_photo = models.ImageField(upload_to="user_image/", blank=True, null=True)
     is_vendor = models.BooleanField(default=False)
+    is_customer = models.BooleanField(default=False)
 
     mobile = models.CharField(max_length=15, unique=True)
     email = models.EmailField(null=True, blank=True)  # Email is optional

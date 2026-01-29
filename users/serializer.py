@@ -27,6 +27,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'gender',
             'address',
             'is_vendor',
+            'is_customer',
             'password',  # Include this for input only
         ]
         read_only_fields = ['id', 'mobile']

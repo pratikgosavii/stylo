@@ -146,11 +146,12 @@ class SignupView(APIView):
                 return Response({"error": "Invalid user_type. Use 'vendor' or 'customer'."}, status=400)
 
             is_vendor = user_type == "vendor"
+            is_customer = user_type == "customer"
             user = User.objects.filter(mobile=mobile).first()
             created = False
 
             if user:
-                existing_role = "vendor" if user.is_vendor else "customer"
+                existing_role = "vendor" if user.is_vendor else ("customer" if user.is_customer else "user")
                 if existing_role != user_type:
                     return Response({
                         "error": f"This number is already registered as a {existing_role}. Cannot register again as {user_type}."
@@ -166,6 +167,7 @@ class SignupView(APIView):
                     first_name=name or "",
                     email=email or "",
                     is_vendor=is_vendor,
+                    is_customer=is_customer,
                 )
                 created = True
 
@@ -217,10 +219,12 @@ class LoginAPIView(APIView):
                     user.save()
             else:
                 is_vendor = request.data.get("user_type") == "vendor"
+                is_customer = request.data.get("user_type") == "customer"
                 user = User.objects.create(
                     mobile=mobile,
                     is_active=True,
                     is_vendor=is_vendor,
+                    is_customer=is_customer,
                 )
                 created = True
 
@@ -233,13 +237,14 @@ class LoginAPIView(APIView):
             if user.is_vendor:
                 is_subscribed = user.subscription_is_active
 
+            role = "vendor" if user.is_vendor else ("customer" if user.is_customer else "user")
             return Response({
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "user": {
                     "id": user.id,
                     "mobile": user.mobile,
-                    "role": "vendor" if user.is_vendor else "customer"
+                    "role": role
                 },
                 "created": created,
                 "is_subscribed": is_subscribed,
@@ -392,9 +397,9 @@ def user_list(request):
 
 def customer_list(request):
     """
-    List all customers (users with is_vendor=False)
+    List all customers (users with is_customer=True)
     """
-    data = User.objects.filter(is_vendor=False).order_by('-date_joined')
+    data = User.objects.filter(is_customer=True).order_by('-date_joined')
     count = data.count()
     
     return render(request, 'customer_list.html', {'data': data, 'count': count})
@@ -403,7 +408,7 @@ def customer_list(request):
 @login_required(login_url='login_admin')
 def export_customer_list_excel(request):
     """Export customer list to Excel"""
-    data = User.objects.filter(is_vendor=False).order_by('-date_joined')
+    data = User.objects.filter(is_customer=True).order_by('-date_joined')
     
     wb = Workbook()
     ws = wb.active

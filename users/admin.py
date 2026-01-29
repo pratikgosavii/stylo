@@ -13,7 +13,7 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ('is_staff', 'is_active', 'is_customer', 'is_vendor', 'is_subuser')
 
     fieldsets = (
-        (None, {'fields': ('mobile', 'email', 'password', 'firebase_uid')}),
+        (None, {'fields': ('mobile', 'email', 'password')}),
         ('Permissions', {'fields': ('is_staff', 'is_active', 'is_superuser')}),
         ('Roles', {'fields': ('is_customer', 'is_vendor', 'is_subuser')}),
         ('Groups & Permissions', {'fields': ('groups', 'user_permissions')}),
