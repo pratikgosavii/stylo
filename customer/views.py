@@ -4,7 +4,7 @@ from django.shortcuts import render
 # Create your views here.
 
 
-from masters.models import MainCategory, product_category, product_subcategory
+from masters.models import MainCategory, product_category, product_subcategory, home_banner
 from users.models import *
 
 from rest_framework import viewsets, permissions
@@ -661,23 +661,324 @@ from rest_framework.response import Response
 from rest_framework import status
 
 import time
+import math
 from django.db import connection
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Return distance in km between two (lat, lon) points. Inputs can be float or Decimal."""
+    lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+    R = 6371  # Earth radius in km
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 2)
+
+
+class CustomerHomeScreenAPIView(APIView):
+    """
+    Single API for customer home screen UI:
+    - User greeting + default delivery address (with optional distance)
+    - Stores nearby (with distance_km, sorted by distance)
+    - Categories (for horizontal icons: Jackets, Tops, Dresses, etc.)
+    - Main categories (for buttons: Women's Fashion, Men's Fashion, etc.)
+    - Banners (app-level promotional)
+    - Featured products (with store name, distance_km, discount %)
+    - Featured collection (second product set)
+    Query params: latitude, longitude (optional; if omitted, uses user's default address for distance).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        req_lat = request.query_params.get("latitude")
+        req_lon = request.query_params.get("longitude")
+
+        # User location: query params or default address
+        user_lat, user_lon = None, None
+        default_address = None
+        default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+        if default_address_obj:
+            default_address = {
+                "id": default_address_obj.id,
+                "full_address_text": default_address_obj.full_address,
+                "latitude": str(default_address_obj.latitude),
+                "longitude": str(default_address_obj.longitude),
+            }
+            user_lat = float(default_address_obj.latitude)
+            user_lon = float(default_address_obj.longitude)
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+
+        # User greeting
+        user_name = (user.first_name or user.last_name or "Customer").strip() or "Customer"
+        user_greeting = {"name": user_name, "greeting": f"Hello, {user_name}"}
+
+        # Stores nearby: all active stores with lat/lon; add distance and sort
+        stores_qs = vendor_store.objects.filter(is_active=True).only(
+            "id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude"
+        )
+        stores_list = list(stores_qs)
+        stores_nearby = []
+        for s in stores_list:
+            item = {
+                "id": s.id,
+                "name": s.name,
+                "profile_image": request.build_absolute_uri(s.profile_image.url) if s.profile_image else None,
+                "banner_image": request.build_absolute_uri(s.banner_image.url) if s.banner_image else None,
+                "latitude": str(s.latitude) if s.latitude else None,
+                "longitude": str(s.longitude) if s.longitude else None,
+                "distance_km": None,
+            }
+            if user_lat is not None and user_lon is not None and s.latitude is not None and s.longitude is not None:
+                item["distance_km"] = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
+            stores_nearby.append(item)
+        stores_nearby.sort(key=lambda x: (x["distance_km"] is None, x["distance_km"] or 999999))
+        stores_nearby = stores_nearby[:20]
+
+        # Categories (product_category for horizontal row: Jackets, Tops, Dresses...)
+        categories_qs = product_category.objects.only("id", "name", "image")[:15]
+        categories = [
+            {
+                "id": c.id,
+                "name": c.name,
+                "image": request.build_absolute_uri(c.image.url) if c.image else None,
+            }
+            for c in categories_qs
+        ]
+
+        # Main categories (for Women's Fashion, Men's Fashion buttons)
+        main_categories = [
+            {"id": mc.id, "name": mc.name}
+            for mc in MainCategory.objects.only("id", "name")
+        ]
+
+        # Banners (app-level: home_banner from masters)
+        banners_qs = home_banner.objects.filter(is_active=True).order_by("-created_at")[:5]
+        banners = [
+            {
+                "id": b.id,
+                "title": b.title or "",
+                "description": b.description or "",
+                "image": request.build_absolute_uri(b.image.url) if b.image else None,
+            }
+            for b in banners_qs
+        ]
+
+        # Featured products: active products with store + distance + discount
+        store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
+        products_featured = (
+            product.objects.filter(is_active=True)
+            .select_related("user", "category", "sub_category")
+            .order_by("?")[:12]
+        )
+        featured_products = []
+        for p in products_featured:
+            store = store_by_user_id.get(p.user_id) if p.user_id else None
+            distance_km = None
+            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+            discount_percent = None
+            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+            prod_data = product_serializer(p, context={"request": request}).data
+            if isinstance(prod_data, dict):
+                prod_data["store_name"] = store.name if store else None
+                prod_data["store_id"] = store.id if store else None
+                prod_data["distance_km"] = distance_km
+                prod_data["discount_percent"] = discount_percent
+            featured_products.append(prod_data)
+
+        # Featured collection: second set (e.g. is_featured or another random set)
+        products_collection = (
+            product.objects.filter(is_active=True, is_featured=True)
+            .select_related("user", "category", "sub_category")
+            .order_by("?")[:12]
+        )
+        if not products_collection:
+            products_collection = (
+                product.objects.filter(is_active=True)
+                .select_related("user", "category", "sub_category")
+                .exclude(id__in=[p.get("id") for p in featured_products if isinstance(p, dict) and p.get("id")])
+                .order_by("?")[:12]
+            )
+        featured_collection = []
+        for p in products_collection:
+            store = store_by_user_id.get(p.user_id) if p.user_id else None
+            distance_km = None
+            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+            discount_percent = None
+            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+            prod_data = product_serializer(p, context={"request": request}).data
+            if isinstance(prod_data, dict):
+                prod_data["store_name"] = store.name if store else None
+                prod_data["store_id"] = store.id if store else None
+                prod_data["distance_km"] = distance_km
+                prod_data["discount_percent"] = discount_percent
+            featured_collection.append(prod_data)
+
+        payload = {
+            "user_greeting": user_greeting,
+            "delivery_address": default_address,
+            "stores_nearby": stores_nearby,
+            "categories": categories,
+            "main_categories": main_categories,
+            "banners": banners,
+            "featured_products": featured_products,
+            "featured_collection": featured_collection,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class MainCategoriesListAPIView(APIView):
+    """GET /customer/main-categories/ — list all main categories (id, name)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = MainCategory.objects.only("id", "name").order_by("name")
+        data = [{"id": m.id, "name": m.name} for m in qs]
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class CategoriesListAPIView(APIView):
+    """GET /customer/categories/?main_category_id=4 — list categories; filter by main_category_id."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        main_category_id = request.query_params.get("main_category_id")
+        qs = product_category.objects.select_related("main_category").only("id", "main_category_id", "name", "image")
+        if main_category_id:
+            qs = qs.filter(main_category_id=main_category_id)
+        data = [
+            {
+                "id": c.id,
+                "main_category_id": c.main_category_id,
+                "name": c.name,
+                "image": request.build_absolute_uri(c.image.url) if c.image else None,
+            }
+            for c in qs.order_by("name")
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class SubcategoriesListAPIView(APIView):
+    """GET /customer/subcategories/?category_id=2 — list subcategories; filter by category_id."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        category_id = request.query_params.get("category_id")
+        qs = product_subcategory.objects.select_related("category").only("id", "category_id", "name", "image")
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+        data = [
+            {
+                "id": s.id,
+                "category_id": s.category_id,
+                "name": s.name,
+                "image": request.build_absolute_uri(s.image.url) if s.image else None,
+            }
+            for s in qs.order_by("name")
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class CategoriesTreeByMainCategoryAPIView(APIView):
+    """
+    GET /customer/main-categories/<main_category_id>/categories-tree/
+    Returns main category + all categories linked to it + all subcategories linked to those categories.
+    Example: main_category_id=4 → main_category (id 4), categories under it, each with subcategories.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, main_category_id):
+        main_cat = MainCategory.objects.filter(id=main_category_id).first()
+        if not main_cat:
+            return Response({"error": "Main category not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        categories_qs = (
+            product_category.objects.filter(main_category_id=main_category_id)
+            .only("id", "name", "image")
+            .order_by("name")
+        )
+        category_ids = list(categories_qs.values_list("id", flat=True))
+        subcategories_qs = (
+            product_subcategory.objects.filter(category_id__in=category_ids)
+            .only("id", "category_id", "name", "image")
+            .order_by("category_id", "name")
+        )
+        sub_by_cat = {}
+        for s in subcategories_qs:
+            sub_by_cat.setdefault(s.category_id, []).append({
+                "id": s.id,
+                "category_id": s.category_id,
+                "name": s.name,
+                "image": request.build_absolute_uri(s.image.url) if s.image else None,
+            })
+
+        categories = []
+        for c in categories_qs:
+            categories.append({
+                "id": c.id,
+                "main_category_id": main_category_id,
+                "name": c.name,
+                "image": request.build_absolute_uri(c.image.url) if c.image else None,
+                "subcategories": sub_by_cat.get(c.id, []),
+            })
+
+        payload = {
+            "main_category": {"id": main_cat.id, "name": main_cat.name},
+            "categories": categories,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
 
 class HomeScreenView(APIView):
     """
-    Return for each MainCategory:
-      - categories (product_category list)
-      - up to 6 random stores that sell products from those categories
-      - up to 6 products (full details) from those categories
+    Category-driven home screen: one section per MainCategory with subcategories,
+    stores that sell those categories, and products. Also returns user_greeting and
+    delivery_address at the top; optional lat/long adds distance_km to stores and products.
 
-    Optimizations:
-      - prefetch related sets for products (variants, addons, print variants)
-      - fetch all reviews for the product batch in a single query and pass via context
-      - fetch store list via user ids derived from product batch (fast)
+    Query params: latitude, longitude (optional; or uses user's default address for distance).
     """
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         start_total = time.time()
+        user = request.user
+        req_lat = request.query_params.get("latitude")
+        req_lon = request.query_params.get("longitude")
+
+        # User location for distance_km (same as CustomerHomeScreenAPIView)
+        user_lat, user_lon = None, None
+        default_address = None
+        default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+        if default_address_obj:
+            default_address = {
+                "id": default_address_obj.id,
+                "full_address_text": default_address_obj.full_address,
+                "latitude": str(default_address_obj.latitude),
+                "longitude": str(default_address_obj.longitude),
+            }
+            user_lat = float(default_address_obj.latitude)
+            user_lon = float(default_address_obj.longitude)
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+
+        user_name = (user.first_name or user.last_name or "Customer").strip() or "Customer"
+        user_greeting = {"name": user_name, "greeting": f"Hello, {user_name}"}
+
         response_data = []
 
         # Prefetch categories (these are product_category linked from MainCategory)
@@ -748,7 +1049,9 @@ class HomeScreenView(APIView):
             # then pick up to 6 random stores for this main category
             # -------------------------
             user_ids = set([p.user_id for p in products if p.user_id])
-            stores_qs = vendor_store.objects.filter(user_id__in=user_ids, is_active=True).only('id', 'name', 'profile_image')
+            stores_qs = vendor_store.objects.filter(user_id__in=user_ids, is_active=True).only(
+                'id', 'user_id', 'name', 'profile_image', 'latitude', 'longitude'
+            )
             stores_list = list(stores_qs)
             # pick random up to 6
             random_stores = random.sample(stores_list, min(6, len(stores_list)))
@@ -756,33 +1059,52 @@ class HomeScreenView(APIView):
             stores_data = []
             for s in random_stores:
                 store_banners = BannerCampaign.objects.filter(
-                    user=s.user,   # 🔥 filter only for this store's owner
+                    user_id=s.user_id,
                     is_approved=True
                 ).order_by('-created_at')[:5]
 
                 store_banners_data = [
                     {
                         'id': b.id,
-                        'banner_image': b.banner_image.url if b.banner_image else None,
+                        'banner_image': request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
                     } for b in store_banners
                 ]
+
+                distance_km = None
+                if user_lat is not None and user_lon is not None and s.latitude is not None and s.longitude is not None:
+                    distance_km = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
 
                 stores_data.append({
                     'id': s.id,
                     'name': s.name,
-                    'profile_image': s.profile_image.url if s.profile_image else None,
-                    'banners': store_banners_data  # 🔥 now store-wise banners
+                    'profile_image': request.build_absolute_uri(s.profile_image.url) if s.profile_image else None,
+                    'latitude': str(s.latitude) if s.latitude else None,
+                    'longitude': str(s.longitude) if s.longitude else None,
+                    'distance_km': distance_km,
+                    'banners': store_banners_data
                 })
 
             # -------------------------
             # Serialize products using product_serializer but pass reviews_map in context
-            # product_serializer must use reviews_map if present to avoid per-object queries
             # -------------------------
-            # prepare serializer context
             ser_context = {'request': request, 'reviews_map': reviews_map}
-
-            # Use your existing serializer but because we prefetched related objects, it should not do extra queries
             products_serialized = product_serializer(products, many=True, context=ser_context).data
+
+            # Enrich each product with store_name, store_id, distance_km, discount_percent (for UI)
+            store_by_user_id = {s.user_id: s for s in stores_list}
+            for i, p in enumerate(products):
+                store = store_by_user_id.get(p.user_id) if p.user_id else None
+                distance_km = None
+                if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                    distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+                discount_percent = None
+                if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                    discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+                if i < len(products_serialized) and isinstance(products_serialized[i], dict):
+                    products_serialized[i]["store_name"] = store.name if store else None
+                    products_serialized[i]["store_id"] = store.id if store else None
+                    products_serialized[i]["distance_km"] = distance_km
+                    products_serialized[i]["discount_percent"] = discount_percent
 
             # -------------------------
             # build response payload for this main category
@@ -791,18 +1113,26 @@ class HomeScreenView(APIView):
                 "main_category_id": main_cat.id,
                 "main_category_name": main_cat.name,
                 "subcategories": [
-                    {"id": c.id, "name": c.name, "image": c.image.url if c.image else None}
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "image": request.build_absolute_uri(c.image.url) if c.image else None,
+                    }
                     for c in categories_qs
                 ],
                 "stores": stores_data,
-                "products": products_serialized
+                "products": products_serialized,
             })
 
         total_ms = (time.time() - start_total) * 1000.0
-        # optional: print timings to server console for debug
         print(f"HomeScreenView total time: {total_ms:.2f} ms")
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        payload = {
+            "user_greeting": user_greeting,
+            "delivery_address": default_address,
+            "sections": response_data,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 

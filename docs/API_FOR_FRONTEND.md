@@ -9,6 +9,142 @@ Authorization: Bearer <access_token>
 
 ---
 
+## 0. Customer Home Screen API
+
+Single API for the customer home UI (as per design).
+
+---
+
+**GET** `/customer/home/`
+
+Single flat payload: greeting, delivery address, **stores nearby** (with distance), categories, main categories, app banners, **featured_products**, **featured_collection**. Best when the UI shows one “stores nearby” list and two product sections (Featured Products, Featured Collection).
+
+| Item | Value |
+|------|--------|
+| **Permission** | Authenticated |
+| **Query params** | Optional: `latitude`, `longitude` (for distance; if omitted, uses user's default address) |
+
+**Response:**
+```json
+{
+  "user_greeting": { "name": "Riya", "greeting": "Hello, Riya" },
+  "delivery_address": {
+    "id": 1,
+    "full_address_text": "#1234, Sector 6, Mumbai",
+    "latitude": "19.0760",
+    "longitude": "72.8777"
+  },
+  "stores_nearby": [
+    {
+      "id": 1,
+      "name": "Fashion Store",
+      "profile_image": "https://...",
+      "banner_image": "https://...",
+      "latitude": "19.08",
+      "longitude": "72.88",
+      "distance_km": 4.5
+    }
+  ],
+  "categories": [
+    { "id": 1, "name": "Jackets", "image": "https://..." },
+    { "id": 2, "name": "Tops", "image": "https://..." }
+  ],
+  "main_categories": [
+    { "id": 1, "name": "Women's Fashion" },
+    { "id": 2, "name": "Men's Fashion" }
+  ],
+  "banners": [
+    { "id": 1, "title": "2025 NEW LOOK", "description": "...", "image": "https://..." }
+  ],
+  "featured_products": [
+    {
+      "id": 1,
+      "name": "...",
+      "sales_price": "299.00",
+      "mrp": "399.00",
+      "image": "https://...",
+      "store_name": "Fashion Store",
+      "store_id": 1,
+      "distance_km": 4.5,
+      "discount_percent": 25
+    }
+  ],
+  "featured_collection": [ ... ]
+}
+```
+
+- **stores_nearby**: Sorted by distance (nearest first); `distance_km` is `null` if user or store location is missing.
+- **featured_products** / **featured_collection**: Each product includes `store_name`, `store_id`, `distance_km`, `discount_percent` for labels like "Fashion Store | 4.5 Km" and "Upto 10%".
+
+**Example:**
+```http
+GET /customer/home/
+GET /customer/home/?latitude=19.0760&longitude=72.8777
+Authorization: Bearer <access_token>
+```
+
+---
+
+## 0a. Main Category, Category & Subcategory APIs (for UI filters / tree)
+
+Use these in the app UI for category pickers and hierarchy: **main categories** → **categories** (filter by `main_category_id`) → **subcategories** (filter by `category_id`). For a single call that returns one main category with all its categories and their subcategories, use the **categories-tree** API.
+
+### Main Categories — **GET** `/customer/main-categories/`
+
+Returns all main categories (id, name). Use for top-level tabs or buttons.
+
+| Item | Value |
+|------|--------|
+| **Permission** | Authenticated |
+
+**Response:** `[ { "id": 1, "name": "Women's Fashion" }, { "id": 4, "name": "Electronics" } ]`
+
+**Example:** `GET /customer/main-categories/` with `Authorization: Bearer <access_token>`
+
+### Categories (filter by main category) — **GET** `/customer/categories/`
+
+Pass `main_category_id` to get only categories under that main category.
+
+**Example:** `GET /customer/categories/?main_category_id=4`
+
+**Response:** Array of `{ "id", "main_category_id", "name", "image" }`
+
+### Subcategories (filter by category) — **GET** `/customer/subcategories/`
+
+Pass `category_id` to get only subcategories under that category.
+
+**Example:** `GET /customer/subcategories/?category_id=10`
+
+**Response:** Array of `{ "id", "category_id", "name", "image" }`
+
+### Categories tree by main category — **GET** `/customer/main-categories/<id>/categories-tree/`
+
+Given **main_category_id** (e.g. 4), returns main category + **all categories linked to it** + **all subcategories linked to those categories**. Use when you need the full hierarchy in one call.
+
+**Example:** `GET /customer/main-categories/4/categories-tree/`
+
+**Response:**
+```json
+{
+  "main_category": { "id": 4, "name": "Electronics" },
+  "categories": [
+    {
+      "id": 10,
+      "main_category_id": 4,
+      "name": "Mobiles",
+      "image": "https://...",
+      "subcategories": [
+        { "id": 101, "category_id": 10, "name": "Smartphones", "image": "https://..." }
+      ]
+    }
+  ]
+}
+```
+If main category not found: `404` with `{"error": "Main category not found."}`.
+
+---
+
+
 ## 1. List Products (Customer)
 
 **GET** `/customer/list-products/`
@@ -267,6 +403,8 @@ For image upload, use `multipart/form-data` and send `image` as a file.
 
 | Feature           | Method | Endpoint |
 |-------------------|--------|----------|
+| **Home screen (flat)** – stores nearby, categories, banners, featured products/collection | GET | `/customer/home/` |
+| **Home screen (category-driven)** – sections per main category, stores/products with distance | GET | `/customer/Home-Screen-Api/` |
 | List products     | GET    | `/customer/list-products/` |
 | Add to cart       | POST   | `/customer/cart/` |
 | List cart         | GET    | `/customer/cart/` |

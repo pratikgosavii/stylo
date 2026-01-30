@@ -50,7 +50,11 @@ path('coupons/', CartCouponAPIView.as_view(), name='CartCouponAPIView'),  # GET 
 path('products/search/', ProductSearchAPIView.as_view(), name='search-products'),
 
 path('stores-by-category/', StoreByCategoryView.as_view(), name='stores-by-category'),
-path('Home-Screen-Api/', HomeScreenView.as_view(), name='HomeScreenView'),
+path('home/', CustomerHomeScreenAPIView.as_view(), name='customer_home_screen'),
+path('main-categories/', MainCategoriesListAPIView.as_view(), name='customer_main_categories'),
+path('main-categories/<int:main_category_id>/categories-tree/', CategoriesTreeByMainCategoryAPIView.as_view(), name='customer_categories_tree'),
+path('categories/', CategoriesListAPIView.as_view(), name='customer_categories'),
+path('subcategories/', SubcategoriesListAPIView.as_view(), name='customer_subcategories'),
 path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by-subcategory'),
 
 
