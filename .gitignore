@@ -8,6 +8,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
+*.pyo
+.Python
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.manifest
+# Migrations cache (in case any app has __pycache__ under migrations)
+**/migrations/__pycache__/
 
 # Firebase (service account / key files – do not commit)
 firebase_key.json
