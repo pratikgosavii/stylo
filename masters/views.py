@@ -219,9 +219,7 @@ from datetime import timedelta
 
 def approve_notification_campaign(request, pk):
     campaign = get_object_or_404(NotificationCampaign, pk=pk)
-    campaign.status = "approved"
-    campaign.start_time = timezone.now()
-    campaign.end_time = timezone.now() + timedelta(days=7)
+    campaign.status = "active"
     campaign.save()
 
     # send push notifications to all followers

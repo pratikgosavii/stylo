@@ -144,3 +144,51 @@ class State(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class NotificationCampaign(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("active", "Active"),
+        ("ended", "Ended"),
+        ("rejected", "Rejected"),
+    ]
+    REDIRECT_CHOICES = [
+        ("store", "Store"),
+        ("product", "Product"),
+        ("custom", "Custom"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    campaign_name = models.CharField(max_length=255)
+    redirect_to = models.CharField(max_length=50, choices=REDIRECT_CHOICES, default="custom")
+    description = models.CharField(max_length=90, default="", blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    budget = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    banner = models.ImageField(upload_to='notifications/banners/', null=True, blank=True)
+    product = models.ForeignKey(
+        "vendor.product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_campaigns',
+    )
+    store = models.ForeignKey(
+        "vendor.vendor_store",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_campaigns',
+    )
+    views = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    is_deleted = models.BooleanField(
+        default=False,
+        help_text="Soft delete flag - campaigns marked as deleted still count toward monthly limit",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.campaign_name} ({self.status})"

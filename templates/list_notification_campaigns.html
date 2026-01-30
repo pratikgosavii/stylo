@@ -36,11 +36,15 @@
                                             {% for i in data %}
                                             <tr>
                                                 <td>{{ forloop.counter }}</td>
-                                                <td>{{ i.name }}</td>
+                                                <td>{{ i.campaign_name }}</td>
                                                 <td>{{ i.description }}</td>
                                                 <td>
                                                     {% if i.status == "approved" %}
                                                         <span class="status-approved">Approved</span>
+                                                    {% elif i.status == "active" %}
+                                                        <span class="status-approved">Active</span>
+                                                    {% elif i.status == "ended" %}
+                                                        <span class="text-muted">Ended</span>
                                                     {% elif i.status == "pending" %}
                                                         <span class="status-pending">Pending</span>
                                                     {% else %}
