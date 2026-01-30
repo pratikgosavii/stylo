@@ -243,39 +243,6 @@
                             </ul>
                         </li>
 
-                         {% comment %} <li>
-                            <a href="javascript: void(0);" class="has-arrow">
-                                <i data-feather="layers"></i>
-                                <span data-key="t-authentication">User Management (next phase) </span>
-                            </a>
-                            <ul class="sub-menu" aria-expanded="false">
-                                
-                                <!-- Manage Role -->
-                                <li>
-                                    <a href="javascript: void(0);" class="has-arrow">
-                                        <span>Manage Role</span>
-                                    </a>
-                                    <ul class="sub-menu" aria-expanded="false">
-                                        <li><a href="{% url 'role_create' %}">Add Role</a></li>
-                                        <li><a href="{% url 'role_list' %}">Role List</a></li>
-                                    </ul>
-                                </li>
-
-                                <!-- Manage User -->
-                                <li>
-                                    <a href="javascript: void(0);" class="has-arrow">
-                                        <span>Manage User</span>
-                                    </a>
-                                    <ul class="sub-menu" aria-expanded="false">
-                                        <li><a href="{% url 'add_user_with_roles' %}">Add User</a></li>
-                                        <li><a href="{% url 'role_list' %}">User List</a></li>
-                                    </ul>
-                                </li>
-
-                            </ul>
-                        </li> {% endcomment %}
-
-                        
                         <li>
                             <a href="{% url 'list_notification_campaigns' %}">
                                 <i data-feather="bell"></i>

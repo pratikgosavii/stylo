@@ -19,6 +19,7 @@ urlpatterns = [
     path('signup/', SignupView.as_view(), name='signup'),
     path('update-user/', UserUpdateView.as_view(), name='UserUpdateView'),
     path('get-user/', UsergetView.as_view(), name='UsergetView'),
+    path('device-token/', RegisterDeviceTokenView.as_view(), name='register_device_token'),
     path('reset-password/', ResetPasswordView.as_view(), name='ResetPasswordView'),
     path('logout/', logout_page, name='logout'),
 

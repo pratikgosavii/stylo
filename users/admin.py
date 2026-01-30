@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User
+from .models import User, DeviceToken
 from .forms import *  # Import your custom form
 
 class CustomUserAdmin(UserAdmin):
@@ -9,13 +9,13 @@ class CustomUserAdmin(UserAdmin):
     form = CustomUserChangeForm
     model = User
 
-    list_display = ('mobile', 'email', 'is_staff', 'is_active', 'is_customer', 'is_vendor', 'is_subuser')
-    list_filter = ('is_staff', 'is_active', 'is_customer', 'is_vendor', 'is_subuser')
+    list_display = ('mobile', 'email', 'is_staff', 'is_active', 'is_customer', 'is_vendor')
+    list_filter = ('is_staff', 'is_active', 'is_customer', 'is_vendor')
 
     fieldsets = (
         (None, {'fields': ('mobile', 'email', 'password')}),
         ('Permissions', {'fields': ('is_staff', 'is_active', 'is_superuser')}),
-        ('Roles', {'fields': ('is_customer', 'is_vendor', 'is_subuser')}),
+        ('Roles', {'fields': ('is_customer', 'is_vendor')}),
         ('Groups & Permissions', {'fields': ('groups', 'user_permissions')}),
     )
 

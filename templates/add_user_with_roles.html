@@ -98,18 +98,6 @@
     {{ form.confirm_password.errors }}
   </div>
 
-  <div class="form-group">
-    <label>Assign Roles</label>
-    {% for checkbox in form.roles %}
-      <div class="form-check">
-        {{ checkbox.tag }}
-        <label class="form-check-label" for="{{ checkbox.id_for_label }}">
-          {{ checkbox.choice_label }}
-        </label>
-      </div>
-    {% endfor %}
-    {{ form.roles.errors }}
-  </div>
                                 <!-- Submit Button -->
                         <div class="text-center">
                             <button type="submit" class="btn btn-primary custom-button">Submit</button>

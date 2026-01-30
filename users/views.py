@@ -42,7 +42,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User, OTP  # Your custom user model
+from .models import User, OTP, DeviceToken
 from .otp_utils import create_and_send_otp, verify_otp
 
 
@@ -259,7 +259,23 @@ class LoginAPIView(APIView):
 
 
 
+from rest_framework.permissions import IsAuthenticated
 from .permissions import *
+
+
+class RegisterDeviceTokenView(APIView):
+    """Register or update FCM device token for the logged-in user. Call after login."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = (request.data.get("token") or "").strip()
+        if not token:
+            return Response({"error": "token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        DeviceToken.objects.update_or_create(
+            user=request.user,
+            defaults={"token": token},
+        )
+        return Response({"message": "Device token registered"}, status=status.HTTP_200_OK)
 
 
 class UsergetView(APIView):

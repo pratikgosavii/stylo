@@ -97,3 +97,13 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.first_name or self.last_name
+
+
+class DeviceToken(models.Model):
+    """FCM device token for push notifications (one per user)."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="device_token")
+    token = models.CharField(max_length=255)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"DeviceToken for {self.user_id}"

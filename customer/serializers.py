@@ -93,6 +93,7 @@ from django.db.models import Max
 
 
 from decimal import Decimal
+from collections import defaultdict
 from users.serializer import UserProfileSerializer
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -143,6 +144,17 @@ class OrderSerializer(serializers.ModelSerializer):
                 )
             )
 
+        # Stock validation: total quantity per product must not exceed available stock
+        qty_by_product = defaultdict(int)
+        for oi in order_items:
+            qty_by_product[oi.product] += oi.quantity
+        for prod, qty in qty_by_product.items():
+            available = prod.stock if prod.stock is not None else 0
+            if available < qty:
+                raise serializers.ValidationError(
+                    {"items": [f"Product '{prod.name}' has insufficient stock (available: {available}, requested: {qty})."]}
+                )
+
         # generate order_id
         order_id = self.generate_order_id()
 
@@ -165,6 +177,11 @@ class OrderSerializer(serializers.ModelSerializer):
         for oi in order_items:
             oi.order = order
         OrderItem.objects.bulk_create(order_items)
+
+        # Deduct stock for each product
+        for prod, qty in qty_by_product.items():
+            prod.stock = (prod.stock or 0) - qty
+            prod.save(update_fields=["stock"])
 
         Cart.objects.filter(user=request.user).delete()
 

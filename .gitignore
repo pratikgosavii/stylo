@@ -1,0 +1,9 @@
+# Database
+db.sqlite3
+*.sqlite3
+*.db
+
+# Firebase (service account / key files – do not commit)
+firebase_key.json
+*firebase*.json
+*-firebase-adminsdk-*.json

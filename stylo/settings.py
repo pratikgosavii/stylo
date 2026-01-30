@@ -80,7 +80,7 @@ import os
 from firebase_admin import credentials, initialize_app
 
 # Firebase Admin SDK setup
-firebase_key_path = os.path.join(BASE_DIR, 'stylo', 'styloo-express-firebase-adminsdk-fbsvc-1e47fc3c8e.json')
+firebase_key_path = os.path.join(BASE_DIR, 'stylo', 'styloo-express-firebase-adminsdk-fbsvc-bc4d0d4691.json')
 cred = credentials.Certificate(firebase_key_path)
 initialize_app(cred)
 

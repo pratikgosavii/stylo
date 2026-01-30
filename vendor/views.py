@@ -657,12 +657,27 @@ class CommonOrderStatusUpdateAPIView(APIView):
             if any(i.status == "delivered" for i in items):
                 return Response({"error": "Cannot cancel after any item is delivered"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Apply status to all items
+        # Statuses that mean order item is reversed → restore product stock
+        REVERSE_STATUSES = {
+            "rejected",
+            "cancelled_by_vendor",
+            "cancelled_by_customer",
+            "returned_by_customer",
+            "returned_by_vendor",
+        }
+
+        # Apply status to all items and restore stock when transitioning to a reverse status
         for i in items:
+            old_status = i.status
             i.status = new_status if new_status in {"accepted", "rejected"} else (
                 new_status if new_status.startswith("cancelled_") else "delivered"
             )
             i.save(update_fields=["status"])
+            # Restore stock only when first transitioning to a reverse status (avoid double restore)
+            if old_status not in REVERSE_STATUSES and i.status in REVERSE_STATUSES:
+                p = i.product
+                p.stock = (p.stock or 0) + i.quantity
+                p.save(update_fields=["stock"])
 
         # Reflect on order.status
         if new_status == "accepted":
@@ -819,7 +834,6 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
                 mobile=mobile,
                 password=password,
                 email=email,
-                is_subuser=True
             )
         serializer.save(user=self.request.user, account_user=account_user, email=email)
 

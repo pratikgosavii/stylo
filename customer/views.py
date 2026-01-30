@@ -1035,6 +1035,58 @@ import hmac
 import hashlib
 import json
 
+
+class CancelOrderByCustomerAPIView(APIView):
+    """
+    Customer cancels their own order. Sets all order items to cancelled_by_customer
+    and restores product stock. Cannot cancel if any item is already delivered.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.prefetch_related("items__product").get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.user_id != request.user.id:
+            return Response({"error": "You can only cancel your own order"}, status=status.HTTP_403_FORBIDDEN)
+
+        items = list(order.items.all())
+        if not items:
+            return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if any(i.status == "delivered" for i in items):
+            return Response(
+                {"error": "Cannot cancel after any item is delivered"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        REVERSE_STATUSES = {
+            "rejected",
+            "cancelled_by_vendor",
+            "cancelled_by_customer",
+            "returned_by_customer",
+            "returned_by_vendor",
+        }
+        new_status = "cancelled_by_customer"
+
+        for i in items:
+            old_status = i.status
+            i.status = new_status
+            i.save(update_fields=["status"])
+            if old_status not in REVERSE_STATUSES:
+                p = i.product
+                p.stock = (p.stock or 0) + i.quantity
+                p.save(update_fields=["stock"])
+
+        order.status = "cancelled"
+        order.save(update_fields=["status"])
+
+        from .serializers import OrderSerializer
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+
 class OrderPaymentSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 

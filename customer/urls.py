@@ -56,6 +56,7 @@ path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by
 
 
 path("stream/chatinit/", ChatInitAPIView.as_view(), name="ChatInitAPIView"),
+path("orders/<int:order_id>/cancel/", CancelOrderByCustomerAPIView.as_view(), name="customer-cancel-order"),
 path("orders/payment-summary/", OrderPaymentSummaryAPIView.as_view(), name="order-payment-summary"),
 path("orders/create-razorpay-order/", CreateRazorpayOrderAPIView.as_view(), name="create-razorpay-order"),
 path("razorpay/webhook/", RazorpayWebhookAPIView.as_view(), name="razorpay-webhook"),
