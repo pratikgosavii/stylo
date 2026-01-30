@@ -43,7 +43,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, OTP, DeviceToken
-from .otp_utils import create_and_send_otp, verify_otp
+from .otp_utils import create_and_send_otp, verify_otp, normalize_mobile
 
 
 class SendOTPView(APIView):
@@ -55,11 +55,10 @@ class SendOTPView(APIView):
         if not mobile:
             return Response({"error": "Mobile number is required"}, status=400)
         
-        # Clean mobile number
-        mobile = ''.join(filter(str.isdigit, str(mobile)))
-        
-        if len(mobile) < 10:
-            return Response({"error": "Invalid mobile number"}, status=400)
+        # Normalize mobile (same format used for storage and verify)
+        mobile = normalize_mobile(mobile)
+        if len(mobile) != 10:
+            return Response({"error": "Invalid mobile number. Use 10 digits or 12 with 91."}, status=400)
         
         # Create and send OTP
         otp_obj, success, message = create_and_send_otp(mobile)
@@ -83,8 +82,10 @@ class VerifyOTPView(APIView):
         if not mobile or not otp_code:
             return Response({"error": "Mobile number and OTP are required"}, status=400)
         
-        # Clean mobile number
-        mobile = ''.join(filter(str.isdigit, str(mobile)))
+        # Normalize mobile (same as send-otp)
+        mobile = normalize_mobile(mobile)
+        if len(mobile) != 10:
+            return Response({"error": "Invalid mobile number."}, status=400)
         
         # Verify OTP
         otp_obj, is_valid, message = verify_otp(mobile, otp_code)
@@ -132,8 +133,10 @@ class SignupView(APIView):
         if not mobile or not otp_code or not user_type:
             return Response({"error": "Mobile, OTP, and user_type are required"}, status=400)
 
-        # Clean mobile number
-        mobile = ''.join(filter(str.isdigit, str(mobile)))
+        # Normalize mobile (same as send-otp)
+        mobile = normalize_mobile(mobile)
+        if len(mobile) != 10:
+            return Response({"error": "Invalid mobile number."}, status=400)
         
         # Verify OTP first
         otp_obj, is_valid, message = verify_otp(mobile, otp_code)
@@ -324,8 +327,10 @@ class ResetPasswordView(APIView):
         if not mobile or not otp_code or not new_password:
             return Response({"error": "Mobile, OTP, and new_password are required"}, status=400)
 
-        # Clean mobile number
-        mobile = ''.join(filter(str.isdigit, str(mobile)))
+        # Normalize mobile (same as send-otp)
+        mobile = normalize_mobile(mobile)
+        if len(mobile) != 10:
+            return Response({"error": "Invalid mobile number."}, status=400)
         
         # Verify OTP
         otp_obj, is_valid, message = verify_otp(mobile, otp_code)

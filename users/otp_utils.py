@@ -18,6 +18,22 @@ def generate_otp(length=6):
     return ''.join([str(random.randint(0, 9)) for _ in range(length)])
 
 
+def normalize_mobile(mobile):
+    """
+    Normalize mobile to a consistent 10-digit form for storage and lookup.
+    Handles Indian numbers: 919876543210 -> 9876543210, 9876543210 -> 9876543210.
+    """
+    mobile = ''.join(filter(str.isdigit, str(mobile)))
+    if not mobile:
+        return mobile
+    # Indian country code: strip leading 91 and take 10 digits
+    if len(mobile) == 12 and mobile.startswith('91'):
+        return mobile[2:]
+    if len(mobile) > 10:
+        return mobile[-10:]
+    return mobile
+
+
 def send_otp_via_msgclub(mobile, otp_code):
     """
     Send OTP via msg.msgclub.net API
@@ -175,8 +191,10 @@ def create_and_send_otp(mobile):
     Returns:
         tuple: (otp_object: OTP, success: bool, message: str)
     """
-    # Clean mobile number (remove +, spaces, etc.)
-    mobile = ''.join(filter(str.isdigit, str(mobile)))
+    # Normalize mobile so send and verify use the same format (10 digits)
+    mobile = normalize_mobile(mobile)
+    if len(mobile) != 10:
+        return None, False, "Invalid mobile number. Must be 10 digits (or 12 with 91)."
     
     # Generate OTP
     otp_code = generate_otp(getattr(settings, 'OTP_LENGTH', 6))
@@ -211,20 +229,33 @@ def verify_otp(mobile, otp_code):
     
     Args:
         mobile: Mobile number
-        otp_code: OTP code to verify
+        otp_code: OTP code to verify (string or int from client)
         
     Returns:
         tuple: (otp_object: OTP or None, is_valid: bool, message: str)
     """
-    # Clean mobile number
-    mobile = ''.join(filter(str.isdigit, str(mobile)))
+    # Raw digits (for fallback: old OTPs may be stored as 12-digit)
+    raw_digits = ''.join(filter(str.isdigit, str(mobile)))
+    # Normalize to same 10-digit form used when sending OTP
+    mobile = normalize_mobile(mobile)
+    if len(mobile) != 10:
+        return None, False, "Invalid mobile number."
+    # Normalize OTP to string so client can send 123456 (number) or "123456" (string)
+    otp_code = str(otp_code).strip()
     
-    # Find the most recent unverified OTP for this mobile
+    # Find the most recent unverified OTP for this mobile (try normalized first)
     otp_obj = OTP.objects.filter(
         mobile=mobile,
         otp_code=otp_code,
         is_verified=False
     ).order_by('-created_at').first()
+    # Fallback: old records may have been stored with 12-digit (e.g. 919876543210)
+    if not otp_obj and raw_digits != mobile:
+        otp_obj = OTP.objects.filter(
+            mobile=raw_digits,
+            otp_code=otp_code,
+            is_verified=False
+        ).order_by('-created_at').first()
     
     if not otp_obj:
         return None, False, "Invalid OTP code"
@@ -239,7 +270,7 @@ def verify_otp(mobile, otp_code):
     otp_obj.verified_at = timezone.now()
     otp_obj.save()
     
-    # Delete all other unverified OTPs for this mobile
-    OTP.objects.filter(mobile=mobile, is_verified=False).exclude(id=otp_obj.id).delete()
+    # Delete all other unverified OTPs for this mobile (use stored mobile on record)
+    OTP.objects.filter(mobile=otp_obj.mobile, is_verified=False).exclude(id=otp_obj.id).delete()
     
     return otp_obj, True, "OTP verified successfully"
