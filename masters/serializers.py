@@ -59,7 +59,7 @@ class product_main_category_serializer(serializers.ModelSerializer):
 
     class Meta:
         model = MainCategory
-        fields = ['id', 'name', 'categories', 'category_details']
+        fields = ['id', 'name', 'category_details']
 
 
 

@@ -105,7 +105,7 @@
                                             <tr>
                                                 <th>#</th>
                                                 <th>Main Category Name</th>
-                                                <th>Linked Categories</th>
+                                                <th>Categories Count</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
@@ -115,13 +115,7 @@
                                                     <tr>
                                                         <td>{{ forloop.counter }}</td>
                                                         <td>{{ item.name }}</td>
-                                                        <td>
-                                                            {% for cat in item.categories.all %}
-                                                                {{ cat.name }}{% if not forloop.last %}, {% endif %}
-                                                            {% empty %}
-                                                                <span class="text-muted">No categories linked</span>
-                                                            {% endfor %}
-                                                        </td>
+                                                        <td>{{ item.categories_count }}</td>
                                                         <td>
                                                             <a href="{% url 'update_product_main_category' item.id %}">
                                                                 <i class="bi bi-pencil-square text-primary action-icons" title="Edit"></i>

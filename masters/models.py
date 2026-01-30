@@ -66,18 +66,17 @@ class size(models.Model):
     def __str__(self):
         return self.name
 
-class product_category(models.Model):
+class MainCategory(models.Model):
     name = models.CharField(max_length=255)
-    image = models.ImageField(upload_to='product_images/')
-
 
     def __str__(self):
         return self.name
 
 
-class MainCategory(models.Model):
+class product_category(models.Model):
+    main_category = models.ForeignKey(MainCategory, on_delete=models.CASCADE, related_name='categories', null=True, blank=True)
     name = models.CharField(max_length=255)
-    categories = models.ManyToManyField(product_category, related_name='main_categories')
+    image = models.ImageField(upload_to='product_images/')
 
     def __str__(self):
         return self.name

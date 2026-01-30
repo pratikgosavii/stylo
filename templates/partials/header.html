@@ -1,32 +1,27 @@
 {% load static %}
 
 {% block extra_css %}
-
 <style>
-
-    body[data-topbar=dark] .header-item {
-    color: black !important;
-}
-
-
+    /* Header: white background, dark text */
+    body[data-topbar=dark] .header-item { color: #2A224C !important; }
+    body[data-topbar=dark] .header-item:hover { color: #754F83 !important; background: rgba(42,34,76,0.06) !important; }
+    body[data-topbar=dark] .logo-txt { color: #2A224C !important; }
 </style>
-
 {% endblock extra_css %}
 
 {% block header %}
-        <header id="page-topbar" style="background-color: #ffdb8a;
-    border-color:#ffdb8a;">
-            <div class="navbar-header" style="background-color: #ffdb8a">
+        <header id="page-topbar">
+            <div class="navbar-header">
                 <div class="d-flex">
                     <!-- LOGO -->
-                    <div style="background-color:#ffdb8a;">
+                    <div class="navbar-brand-box">
                         
                         <a href="{% url 'dashboard' %}" class="logo logo-dark">
                             <span class="logo-sm">
-                                <img src="{% static 'images/vetinary_logo.png'%}" alt="" height="30">
+                                <img src="{% static 'images/stylo_logo.png'%}" alt="Stylo Express" height="30">
                             </span>
                             <span class="logo-lg">
-                                <img src="{% static 'images/vetinary_logo.png'%}" alt="" height="24"> <span class="logo-txt">AVENZA</span>
+                                <img src="{% static 'images/stylo_logo.png'%}" alt="Stylo Express" height="24">
                             </span>
                         </a>
 

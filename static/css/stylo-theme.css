@@ -1,0 +1,171 @@
+/* Stylo theme: #2A224C (dark purplish-blue), #754F83 (medium purple) */
+
+:root {
+    --stylo-dark: #2A224C;
+    --stylo-purple: #754F83;
+    --stylo-dark-rgb: 42, 34, 76;
+    --stylo-purple-rgb: 117, 79, 131;
+}
+
+/* Bootstrap primary = dark accent */
+:root, [data-bs-theme=light] {
+    --bs-primary: #2A224C;
+    --bs-primary-rgb: var(--stylo-dark-rgb);
+}
+
+/* Buttons: gradient like OTP screen (left #2A224C → right #754F83), white text, border #2A224C */
+.btn-primary,
+.btn.btn-primary,
+button.btn-primary,
+input[type="submit"].btn-primary,
+a.btn-primary {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    border: 0.7px solid #2A224C !important;
+    color: #fff !important;
+    border-radius: 10px;
+}
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active {
+    background: linear-gradient(to right, #1f1a3a, #654370) !important;
+    border-color: #2A224C !important;
+    color: #fff !important;
+}
+
+/* Outline primary: border + text in dark */
+.btn-outline-primary {
+    border: 0.7px solid #2A224C !important;
+    color: #2A224C !important;
+    background: transparent !important;
+    border-radius: 10px;
+}
+.btn-outline-primary:hover {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    color: #fff !important;
+    border-color: #2A224C !important;
+}
+
+/* ========== Header: white ========== */
+#page-topbar,
+.navbar-header,
+.navbar-brand-box {
+    background: #fff !important;
+    border-bottom: 1px solid #e9e9ef !important;
+    border-color: #e9e9ef !important;
+}
+body[data-topbar=dark] #page-topbar,
+body[data-topbar=dark] .navbar-brand-box {
+    background: #fff !important;
+    border-color: #e9e9ef !important;
+}
+body[data-topbar=dark] .navbar-header { background: transparent !important; }
+body[data-topbar=dark] .logo-light { display: none !important; }
+body[data-topbar=dark] .logo-dark { display: block !important; }
+
+/* ========== Sidebar: clean light theme, accent only on active ========== */
+.vertical-menu {
+    background: #fff !important;
+    border-right: 1px solid #e9e9ef !important;
+}
+#sidebar-menu ul li a {
+    color: #2A224C !important;
+}
+#sidebar-menu ul li a i,
+#sidebar-menu ul li a svg {
+    color: #545a6d !important;
+}
+#sidebar-menu ul li a:hover {
+    background: rgba(42, 34, 76, 0.06) !important;
+    color: #754F83 !important;
+}
+#sidebar-menu ul li a:hover i,
+#sidebar-menu ul li a:hover svg {
+    color: #754F83 !important;
+}
+/* Parent with arrow (expanded section): subtle background, no gradient – stays distinct from children */
+#sidebar-menu .mm-active > a.has-arrow {
+    background: rgba(42, 34, 76, 0.08) !important;
+    color: #2A224C !important;
+    border-left: 3px solid #754F83;
+}
+#sidebar-menu .mm-active > a.has-arrow i,
+#sidebar-menu .mm-active > a.has-arrow svg {
+    color: #2A224C !important;
+}
+/* Sub-menu links (default and hover) */
+#sidebar-menu ul li ul.sub-menu li a {
+    color: #495057 !important;
+}
+#sidebar-menu ul li ul.sub-menu li a:hover {
+    color: #754F83 !important;
+    background: rgba(42, 34, 76, 0.04) !important;
+}
+/* Current page (leaf link only): gradient – exclude parent rows that have .has-arrow */
+#sidebar-menu .mm-active .active,
+#sidebar-menu ul li ul.sub-menu li.mm-active > a:not(.has-arrow) {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    color: #fff !important;
+    border-radius: 8px;
+    margin: 2px 12px;
+}
+#sidebar-menu .mm-active .active i,
+#sidebar-menu .mm-active .active svg,
+#sidebar-menu ul li ul.sub-menu li.mm-active > a:not(.has-arrow) i,
+#sidebar-menu ul li ul.sub-menu li.mm-active > a:not(.has-arrow) svg {
+    color: #fff !important;
+}
+/* Top-level link when active (e.g. Dashboard) */
+#sidebar-menu > ul > li.mm-active > a:not(.has-arrow) {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    color: #fff !important;
+    border-radius: 8px;
+    margin: 2px 12px;
+}
+#sidebar-menu > ul > li.mm-active > a:not(.has-arrow) i,
+#sidebar-menu > ul > li.mm-active > a:not(.has-arrow) svg {
+    color: #fff !important;
+}
+
+/* Links and text accents */
+a:not(.btn) {
+    color: #2A224C;
+}
+a:not(.btn):hover {
+    color: #754F83;
+}
+
+/* Form focus */
+.form-control:focus,
+.form-select:focus {
+    border-color: #754F83;
+    box-shadow: 0 0 0 0.2rem rgba(117, 79, 131, 0.25);
+}
+
+/* Badges / pills */
+.badge.bg-primary,
+.bg-primary {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    border: 0.7px solid #2A224C;
+}
+
+/* Progress bar */
+.progress-bar.bg-primary {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+}
+
+/* Custom button class for non-Bootstrap pages (e.g. login) */
+.btn-stylo,
+.btn-purple {
+    background: linear-gradient(to right, #2A224C, #754F83) !important;
+    border: 0.7px solid #2A224C !important;
+    color: #fff !important;
+    border-radius: 10px;
+    min-height: 44px;
+}
+.btn-stylo:hover,
+.btn-purple:hover {
+    background: linear-gradient(to right, #1f1a3a, #654370) !important;
+    color: #fff !important;
+    border-color: #2A224C !important;
+}
