@@ -173,6 +173,11 @@ class OrderSerializer(serializers.ModelSerializer):
             total_amount=total_amount,
         )
 
+        # Generate 6-digit trial OTP for delivery verification (trial begin)
+        import random
+        order.trial_otp = str(random.randint(100000, 999999))
+        order.save(update_fields=["trial_otp"])
+
         # bulk create items with linked order
         for oi in order_items:
             oi.order = order
@@ -299,3 +304,24 @@ class ProductRequestSerializer(serializers.ModelSerializer):
                 return VendorStoreSerializer2(store).data
         except:
             return None
+
+
+class ReelCommentSerializer(serializers.ModelSerializer):
+    """Comment on a reel. Used in list/detail."""
+    user_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ReelComment
+        fields = ["id", "user", "user_name", "reel", "text", "created_at"]
+        read_only_fields = ["user", "reel", "created_at"]
+
+    def get_user_name(self, obj):
+        if not obj.user:
+            return None
+        parts = [obj.user.first_name, obj.user.last_name]
+        return " ".join(p for p in parts if p).strip() or obj.user.username
+
+    def create(self, validated_data):
+        validated_data["user"] = self.context["request"].user
+        validated_data["reel"] = self.context.get("reel")
+        return super().create(validated_data)

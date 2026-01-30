@@ -833,19 +833,25 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from users.models import User
-        email = self.request.data.get("email")
+        username = (self.request.data.get("username") or "").strip()
         password = self.request.data.get("password")
-        mobile = self.request.data.get("mobile")
+        mobile = (self.request.data.get("mobile") or "").strip()
+        email = self.request.data.get("email") or ""
 
         account_user = None
-        if mobile and password:
-            # Create a login account for the delivery boy
+        if username and password:
+            # Create login account: User uses mobile as USERNAME_FIELD, so we store username in mobile for delivery boy login
+            if User.objects.filter(mobile=username).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"username": "This username is already taken."})
             account_user = User.objects.create_user(
-                mobile=mobile,
+                mobile=username,
                 password=password,
-                email=email,
+                email=email or None,
             )
-        serializer.save(user=self.request.user, account_user=account_user, email=email)
+            account_user.is_deliveryboy = True
+            account_user.save(update_fields=["is_deliveryboy"])
+        serializer.save(user=self.request.user, account_user=account_user, username=username or None, mobile=mobile, email=email)
 
 
     

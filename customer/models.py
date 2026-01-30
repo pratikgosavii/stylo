@@ -131,8 +131,12 @@ class Order(models.Model):
     )
 
     ORDER_STATUS = [
+        ('ready_to_dispatch', 'Ready to Dispatch'),
         ('not_accepted', 'Not Accepted'),
         ('accepted', 'Accepted'),
+        ('in_transit', 'In Transit'),
+        ('trial_begin', 'Trial Begin'),
+        ('trial_ended', 'Trial Ended'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
     ]
@@ -146,13 +150,18 @@ class Order(models.Model):
 
     order_id = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='not_accepted')
+    status = models.CharField(max_length=20, choices=ORDER_STATUS, default='not_accepted')  # ready_to_dispatch, not_accepted, accepted, in_transit, trial_begin, trial_ended, cancelled, completed
     payment_mode = models.CharField(max_length=50, default='COD')
     is_paid = models.BooleanField(default=False)
       
     # Delivery verification OTP
     delivery_otp = models.CharField(max_length=6, blank=True, null=True)
     delivery_otp_generated_at = models.DateTimeField(blank=True, null=True)
+
+    # Trial OTP (6-digit, generated when order is created; customer enters OTP to mark trial_begin)
+    trial_otp = models.CharField(max_length=6, blank=True, null=True)
+    trial_begins_at = models.DateTimeField(blank=True, null=True, help_text="Set when customer verifies trial OTP (trial begin)")
+    trial_ends_at = models.DateTimeField(blank=True, null=True, help_text="Set when customer ends trial (trial ended)")
 
     delivery_type = models.CharField(
         max_length=50,
@@ -180,25 +189,16 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('intransit', 'In Transit'),
-        ('delivered', 'Delivered'),
-        ('delivery_boy_assigned', 'delivery_boy_assigned'),
-        ('accepted', 'accepted'),
-        ('rejected', 'rejected'),
-        
-        ('returned_by_customer', 'returned_by_customer'),
-        ('returned_by_vendor', 'returned_by_vendor'),
-        ('approved_by_customer', 'approved_by_customer'),
-        ('cancelled_by_vendor', 'cancelled_by_vendor'),
-        ('cancelled_by_customer', 'cancelled_by_customer'),
+        ('ordered', 'Ordered'),
+        ('returned', 'Returned'),
+        ('replace', 'Replace'),
     ]
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("vendor.product", on_delete=models.CASCADE, related_name="items")
     quantity = models.IntegerField(default=1)
     price = models.IntegerField()
-    status = models.CharField(max_length=28, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=28, choices=STATUS_CHOICES, default='ordered')
     tracking_link = models.URLField(max_length=500, blank=True, null=True)  # ✅ added
 
     def total_price(self):
@@ -227,6 +227,34 @@ class FavouriteStore(models.Model):
 
     class Meta:
         unique_together = ("user", "store")
+
+
+class ReelLike(models.Model):
+    """Customer like on a reel. One like per user per reel."""
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="reel_likes")
+    reel = models.ForeignKey("vendor.Reel", on_delete=models.CASCADE, related_name="likes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "reel")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} likes reel {self.reel_id}"
+
+
+class ReelComment(models.Model):
+    """Customer comment on a reel."""
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="reel_comments")
+    reel = models.ForeignKey("vendor.Reel", on_delete=models.CASCADE, related_name="comments")
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Comment by {self.user} on reel {self.reel_id}"
 
 
 

@@ -42,7 +42,9 @@ path('follow/', FollowUserAPIView.as_view(), name='following-list'),      # GET 
 path('unfollow/', UnfollowUserAPIView.as_view(), name='followers-list'),  # GET = who follows me
 
 path('vendor-banner/', RandomBannerAPIView.as_view(), name='RandomBannerAPIView'),  # GET = who follows me
-path('reels/', reelsView.as_view(), name='reelsView'),  # GET = who follows me
+path('reels/', reelsView.as_view(), name='reelsView'),
+path('reels/<int:reel_id>/like/', ReelLikeAPIView.as_view(), name='reel-like'),
+path('reels/<int:reel_id>/comments/', ReelCommentListCreateAPIView.as_view(), name='reel-comments'),
 path('offers/', offersView.as_view(), name='offersView'),  # GET = who follows me
 
 path('coupons/', CartCouponAPIView.as_view(), name='CartCouponAPIView'),  # GET = who follows me
@@ -62,6 +64,8 @@ path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by
 
 
 path("stream/chatinit/", ChatInitAPIView.as_view(), name="ChatInitAPIView"),
+path("verify-trial-otp/", VerifyTrialOTPAPIView.as_view(), name="customer-verify-trial-otp"),
+path("end-trial/", EndTrialAPIView.as_view(), name="customer-end-trial"),
 path("orders/<int:order_id>/cancel/", CancelOrderByCustomerAPIView.as_view(), name="customer-cancel-order"),
 path("orders/payment-summary/", OrderPaymentSummaryAPIView.as_view(), name="order-payment-summary"),
 path("orders/create-razorpay-order/", CreateRazorpayOrderAPIView.as_view(), name="create-razorpay-order"),

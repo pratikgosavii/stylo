@@ -63,6 +63,7 @@ class User(AbstractUser):
     profile_photo = models.ImageField(upload_to="user_image/", blank=True, null=True)
     is_vendor = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=False)
+    is_deliveryboy = models.BooleanField(default=False)
 
     mobile = models.CharField(max_length=15, unique=True)
     email = models.EmailField(null=True, blank=True)  # Email is optional

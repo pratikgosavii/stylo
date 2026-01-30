@@ -128,8 +128,6 @@ class Reel(models.Model):
     media = models.FileField(upload_to='posts/')  # upload media
     description = models.TextField(blank=True)
     product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
-    boost_post = models.BooleanField(default=False)
-    budget = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -243,6 +241,7 @@ class SpotlightProduct(models.Model):
 
 class DeliveryBoy(models.Model):
     name = models.CharField(max_length=100)
+    username = models.CharField(max_length=150, unique=True, blank=True, null=True, help_text="Login username for delivery boy")
     mobile = models.CharField(max_length=15)
     email = models.EmailField(blank=True, null=True)
     photo = models.ImageField(upload_to='delivery_boys/', null=True, blank=True)

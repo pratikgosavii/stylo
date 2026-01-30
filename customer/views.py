@@ -404,12 +404,128 @@ class RandomBannerAPIView(APIView):
 
 
 class reelsView(APIView):
+    """
+    GET /customer/reels/
+    Returns all reels with like_count, comment_count, is_liked, comments (last 10 per reel).
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        products = Reel.objects.all()
-        serializer = ReelSerializer(products, many=True)
-        return Response(serializer.data)
+        from django.db.models import Count
+        from .serializers import ReelCommentSerializer
+
+        reels = Reel.objects.all().order_by("-created_at")
+        serializer = ReelSerializer(reels, many=True, context={"request": request})
+        data = serializer.data
+
+        reel_ids = [r["id"] for r in data]
+        if not reel_ids:
+            return Response(data)
+
+        # Bulk: like count per reel
+        like_counts = dict(
+            ReelLike.objects.filter(reel_id__in=reel_ids)
+            .values("reel_id")
+            .annotate(c=Count("id"))
+            .values_list("reel_id", "c")
+        )
+        # Bulk: comment count per reel
+        comment_counts = dict(
+            ReelComment.objects.filter(reel_id__in=reel_ids)
+            .values("reel_id")
+            .annotate(c=Count("id"))
+            .values_list("reel_id", "c")
+        )
+        # Bulk: reels liked by current user
+        liked_reel_ids = set(
+            ReelLike.objects.filter(reel_id__in=reel_ids, user=request.user).values_list("reel_id", flat=True)
+        )
+        # Last 10 comments per reel (for list we include count; fetch comments for each reel for response)
+        comments_qs = (
+            ReelComment.objects.filter(reel_id__in=reel_ids)
+            .select_related("user")
+            .order_by("reel_id", "-created_at")
+        )
+        comments_by_reel = {}
+        for c in comments_qs:
+            if c.reel_id not in comments_by_reel:
+                comments_by_reel[c.reel_id] = []
+            if len(comments_by_reel[c.reel_id]) < 10:
+                comments_by_reel[c.reel_id].append(c)
+
+        for item in data:
+            rid = item["id"]
+            item["like_count"] = like_counts.get(rid, 0)
+            item["comment_count"] = comment_counts.get(rid, 0)
+            item["is_liked"] = rid in liked_reel_ids
+            item["comments"] = ReelCommentSerializer(comments_by_reel.get(rid, []), many=True).data
+
+        return Response(data)
+
+
+class ReelLikeAPIView(APIView):
+    """
+    POST /customer/reels/<reel_id>/like/ — add like (idempotent).
+    DELETE /customer/reels/<reel_id>/like/ — remove like.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, reel_id):
+        try:
+            reel = Reel.objects.get(id=reel_id)
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=status.HTTP_404_NOT_FOUND)
+        _, created = ReelLike.objects.get_or_create(user=request.user, reel=reel)
+        like_count = ReelLike.objects.filter(reel=reel).count()
+        return Response(
+            {"detail": "Liked." if created else "Already liked.", "like_count": like_count},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, reel_id):
+        try:
+            reel = Reel.objects.get(id=reel_id)
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=status.HTTP_404_NOT_FOUND)
+        deleted, _ = ReelLike.objects.filter(user=request.user, reel=reel).delete()
+        like_count = ReelLike.objects.filter(reel=reel).count()
+        return Response(
+            {"detail": "Like removed." if deleted else "Was not liked.", "like_count": like_count},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ReelCommentListCreateAPIView(APIView):
+    """
+    GET /customer/reels/<reel_id>/comments/ — list comments for reel.
+    POST /customer/reels/<reel_id>/comments/ — add comment. Body: { "text": "..." }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, reel_id):
+        try:
+            Reel.objects.get(id=reel_id)
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=status.HTTP_404_NOT_FOUND)
+        comments = ReelComment.objects.filter(reel_id=reel_id).select_related("user").order_by("-created_at")
+        from .serializers import ReelCommentSerializer
+        serializer = ReelCommentSerializer(comments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, reel_id):
+        try:
+            reel = Reel.objects.get(id=reel_id)
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=status.HTTP_404_NOT_FOUND)
+        text = request.data.get("text") or (request.data.get("comment") and request.data["comment"])
+        if not text or not str(text).strip():
+            return Response({"detail": "text is required."}, status=status.HTTP_400_BAD_REQUEST)
+        from .serializers import ReelCommentSerializer
+        serializer = ReelCommentSerializer(data={"text": str(text).strip()}, context={"request": request, "reel": reel})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -470,17 +586,6 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
         favourites = FavouriteStore.objects.filter(user=request.user).select_related('store')
         stores = [fav.store for fav in favourites]
         serializer = VendorStoreSerializer(stores, many=True)
-        return Response(serializer.data)
-    
-
-
-
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        products = Reel.objects.all()
-        serializer = ReelSerializer(products, many=True)
         return Response(serializer.data)
 
 
@@ -691,8 +796,10 @@ class ProductSearchAPIView(ListAPIView):
 
 class StoreBySubCategoryView(APIView):
     """
-    Get all vendor stores that have products in a given subcategory.
+    GET /customer/stores-by-subcategory/?subcategory_id=<id>
+    Returns all vendor stores that have (active) products in the given subcategory.
     """
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         subcategory_id = request.query_params.get('subcategory_id')
@@ -722,8 +829,10 @@ class StoreBySubCategoryView(APIView):
 
 class StoreByCategoryView(APIView):
     """
-    Get all vendor stores that have products in a given subcategory.
+    GET /customer/stores-by-category/?category_id=<id>
+    Returns all vendor stores that have (active) products in the given category.
     """
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         category_id = request.query_params.get('category_id')
@@ -1604,6 +1713,107 @@ import datetime as dt
 import hmac
 import hashlib
 import json
+from django.utils import timezone
+
+
+class VerifyTrialOTPAPIView(APIView):
+    """
+    POST /customer/verify-trial-otp/
+    Body: { "order_id": "<order_id string>", "trial_otp": "123456" }
+    Customer enters the trial OTP (e.g. received from delivery boy). Verifies OTP and marks order as trial_begin.
+    Order must belong to the logged-in customer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get("order_id")
+        trial_otp = request.data.get("trial_otp")
+
+        if not order_id or trial_otp is None or trial_otp == "":
+            return Response(
+                {"detail": "order_id and trial_otp are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        trial_otp = str(trial_otp).strip()
+
+        try:
+            order = Order.objects.get(order_id=order_id)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.user_id != request.user.id:
+            return Response({"detail": "You can only verify trial OTP for your own order."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not order.trial_otp:
+            return Response({"detail": "This order has no trial OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if order.trial_otp != trial_otp:
+            return Response({"detail": "Invalid trial OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = "trial_begin"
+        order.trial_begins_at = timezone.now()
+        order.save(update_fields=["status", "trial_begins_at"])
+
+        return Response(
+            {
+                "detail": "Trial OTP verified. Order marked as trial begin.",
+                "order_id": order.order_id,
+                "status": order.status,
+                "trial_begins_at": order.trial_begins_at.isoformat() if order.trial_begins_at else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class EndTrialAPIView(APIView):
+    """
+    POST /customer/end-trial/
+    Body: { "order_id": "<order_id string>" }
+    Customer ends the trial for their order. Marks order status as trial_ended and sets trial_ends_at.
+    Order must belong to the logged-in customer and must be in trial_begin.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get("order_id")
+
+        if not order_id:
+            return Response(
+                {"detail": "order_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            order = Order.objects.get(order_id=order_id)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.user_id != request.user.id:
+            return Response(
+                {"detail": "You can only end trial for your own order."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if order.status != "trial_begin":
+            return Response(
+                {"detail": "Only orders in trial begin can be ended. Current status: %s" % order.status},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.status = "trial_ended"
+        order.trial_ends_at = timezone.now()
+        order.save(update_fields=["status", "trial_ends_at"])
+
+        return Response(
+            {
+                "detail": "Trial ended. Order marked as trial ended.",
+                "order_id": order.order_id,
+                "status": order.status,
+                "trial_ends_at": order.trial_ends_at.isoformat() if order.trial_ends_at else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class CancelOrderByCustomerAPIView(APIView):
