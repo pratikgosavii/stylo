@@ -52,7 +52,6 @@ urlpatterns = [
     path("delivery-boy/logout/", DeliveryBoyLogoutAPIView.as_view(), name="delivery-boy-logout"),
 
 
-
 ]  + router.urls
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
