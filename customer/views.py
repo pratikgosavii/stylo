@@ -682,11 +682,11 @@ class CustomerHomeScreenAPIView(APIView):
     Single API for customer home screen UI:
     - User greeting + default delivery address (with optional distance)
     - Stores nearby (with distance_km, sorted by distance)
-    - Categories (for horizontal icons: Jackets, Tops, Dresses, etc.)
-    - Main categories (for buttons: Women's Fashion, Men's Fashion, etc.)
+    - Categories (for horizontal icons), Main categories (for buttons)
     - Banners (app-level promotional)
-    - Featured products (with store name, distance_km, discount %)
-    - Featured collection (second product set)
+    - Top picks (products with is_popular=True; store_name, distance_km, discount_percent)
+    - Offers (app-level promotional offers; same source as banners for "Offers" section)
+    - Featured products, Featured collection (with store name, distance_km, discount %)
     Query params: latitude, longitude (optional; if omitted, uses user's default address for distance).
     """
     permission_classes = [IsAuthenticated]
@@ -825,6 +825,40 @@ class CustomerHomeScreenAPIView(APIView):
                 prod_data["discount_percent"] = discount_percent
             featured_collection.append(prod_data)
 
+        # Top picks: products marked is_popular (same structure as featured_products)
+        products_top_picks = (
+            product.objects.filter(is_active=True, is_popular=True)
+            .select_related("user", "category", "sub_category")
+            .order_by("?")[:10]
+        )
+        top_picks = []
+        for p in products_top_picks:
+            store = store_by_user_id.get(p.user_id) if p.user_id else None
+            distance_km = None
+            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+            discount_percent = None
+            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+            prod_data = product_serializer(p, context={"request": request}).data
+            if isinstance(prod_data, dict):
+                prod_data["store_name"] = store.name if store else None
+                prod_data["store_id"] = store.id if store else None
+                prod_data["distance_km"] = distance_km
+                prod_data["discount_percent"] = discount_percent
+            top_picks.append(prod_data)
+
+        # Offers: app-level promotional offers (same as banners for "Offers" section on home)
+        offers = [
+            {
+                "id": b.id,
+                "title": b.title or "",
+                "description": b.description or "",
+                "image": request.build_absolute_uri(b.image.url) if b.image else None,
+            }
+            for b in banners_qs
+        ]
+
         payload = {
             "user_greeting": user_greeting,
             "delivery_address": default_address,
@@ -832,6 +866,8 @@ class CustomerHomeScreenAPIView(APIView):
             "categories": categories,
             "main_categories": main_categories,
             "banners": banners,
+            "top_picks": top_picks,
+            "offers": offers,
             "featured_products": featured_products,
             "featured_collection": featured_collection,
         }

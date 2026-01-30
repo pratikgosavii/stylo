@@ -17,7 +17,7 @@ Single API for the customer home UI (as per design).
 
 **GET** `/customer/home/`
 
-Single flat payload: greeting, delivery address, **stores nearby** (with distance), categories, main categories, app banners, **featured_products**, **featured_collection**. Best when the UI shows one “stores nearby” list and two product sections (Featured Products, Featured Collection).
+Single flat payload: greeting, delivery address, **stores nearby** (with distance), categories, main categories, app **banners**, **top_picks** (popular products), **offers** (promotional offers), **featured_products**, **featured_collection**. Best when the UI shows one “stores nearby” list and two product sections (Featured Products, Featured Collection).
 
 | Item | Value |
 |------|--------|
@@ -56,6 +56,22 @@ Single flat payload: greeting, delivery address, **stores nearby** (with distanc
   "banners": [
     { "id": 1, "title": "2025 NEW LOOK", "description": "...", "image": "https://..." }
   ],
+  "top_picks": [
+    {
+      "id": 1,
+      "name": "...",
+      "sales_price": "299.00",
+      "mrp": "399.00",
+      "image": "https://...",
+      "store_name": "Fashion Store",
+      "store_id": 1,
+      "distance_km": 4.5,
+      "discount_percent": 25
+    }
+  ],
+  "offers": [
+    { "id": 1, "title": "2025 NEW LOOK", "description": "...", "image": "https://..." }
+  ],
   "featured_products": [
     {
       "id": 1,
@@ -74,6 +90,8 @@ Single flat payload: greeting, delivery address, **stores nearby** (with distanc
 ```
 
 - **stores_nearby**: Sorted by distance (nearest first); `distance_km` is `null` if user or store location is missing.
+- **top_picks**: Products marked as popular (`is_popular`); same structure as featured_products (includes `store_name`, `store_id`, `distance_km`, `discount_percent`). Up to 10 items.
+- **offers**: App-level promotional offers (same source as banners); use for an "Offers" section on home. Each has `id`, `title`, `description`, `image`.
 - **featured_products** / **featured_collection**: Each product includes `store_name`, `store_id`, `distance_km`, `discount_percent` for labels like "Fashion Store | 4.5 Km" and "Upto 10%".
 
 **Example:**
