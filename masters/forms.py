@@ -7,9 +7,9 @@ from django.contrib.admin.widgets import  AdminDateWidget, AdminTimeWidget, Admi
 class MainCategoryForm(forms.ModelForm):
     class Meta:
         model = MainCategory
-        fields = ['name', 'categories']
+        fields = ['name']
         widgets = {
-            'categories': forms.CheckboxSelectMultiple(),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'id': 'name'}),
         }
 
 class cityForm(forms.ModelForm):
@@ -80,16 +80,11 @@ class expense_category_Form(forms.ModelForm):
 class product_category_Form(forms.ModelForm):
     class Meta:
         model = product_category
-        fields = '__all__'
+        fields = ['main_category', 'name', 'image']
         widgets = {
-           
-            'name': forms.TextInput(attrs={
-                'class': 'form-control', 'id': 'name'
-            }),
-
+            'main_category': forms.Select(attrs={'class': 'form-control', 'id': 'main_category'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'id': 'name'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-
-
         }
 
 class product_subcategory_Form(forms.ModelForm):

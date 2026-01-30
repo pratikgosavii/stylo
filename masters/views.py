@@ -21,6 +21,7 @@ from rest_framework.generics import ListAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Count
 
 
 
@@ -450,7 +451,7 @@ def update_product_main_category(request, product_main_category_id):
 
 def list_product_main_category(request):
 
-    data = MainCategory.objects.all()
+    data = MainCategory.objects.annotate(categories_count=Count('categories'))
 
     return render(request, 'main_category_list.html', {'data' : data})
 
@@ -459,7 +460,7 @@ def delete_product_main_category(request, product_main_category_id):
 
     data = MainCategory.objects.get(id = product_main_category_id).delete()
 
-    return redirect('list_product_category')
+    return redirect('list_product_main_category')
 
 
 
@@ -524,7 +525,7 @@ def update_product_category(request, product_category_id):
 
 def list_product_category(request):
 
-    data = product_category.objects.all()
+    data = product_category.objects.select_related('main_category').all()
 
     return render(request, 'list_product_category.html', {'data' : data})
 

@@ -60,6 +60,11 @@
                         {% csrf_token %}
                         
                         <div class="mb-4">
+                            <label for="main_category" class="form-label">Main Category:</label>
+                            {{ form.main_category }}
+                        </div>
+                        
+                        <div class="mb-4">
                             <label for="name" class="form-label">Name:</label>
                             {{ form.name }}
                         </div>

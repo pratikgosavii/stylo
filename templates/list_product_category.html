@@ -107,6 +107,7 @@
                                             <thead>
                                             <tr>
                                                 <th>#</th>
+                                                <th>Main Category</th>
                                                 <th>Name</th>
                                                 <th>Action</th>
                                             </tr>
@@ -116,6 +117,7 @@
                                             {% for i in data %}
                                                 <tr>
                                                     <td>{{ forloop.counter }}</td>
+                                                    <td>{% if i.main_category %}{{ i.main_category.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                                                     <td>{{ i.name }}</td>
                                                   
                                                     <td>
