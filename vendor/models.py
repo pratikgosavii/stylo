@@ -52,21 +52,75 @@ class coupon(models.Model):
 
 
 class vendor_store(models.Model):
+    """Store Creation: store name, business type, description, logo, cover; Registered Business Address; optional vendor/owner address and contact."""
+
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
+
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="vendor_store", blank=True, null=True)
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=255, help_text="Store name")
     storetag = models.CharField(max_length=50, blank=True, null=True)
     banner_image = models.ImageField(upload_to='store/', blank=True, null=True)
-    profile_image = models.ImageField(upload_to='store/', blank=True, null=True)
-    about = models.CharField(max_length=500, blank=True, null=True)
+    profile_image = models.ImageField(upload_to='store/', blank=True, null=True, help_text="Store logo")
+    about = models.CharField(max_length=500, blank=True, null=True, help_text="Store description")
+    business_type = models.CharField(max_length=100, blank=True, null=True, help_text="Business type")
+
+    # Store contact
+    store_mobile = models.CharField(max_length=20, blank=True, null=True)
+    store_email = models.EmailField(blank=True, null=True)
+
+    # Registered Business Address (Store address)
+    house_building_no = models.CharField(max_length=255, blank=True, null=True, help_text="House/Building/Apartment No.")
+    locality_street = models.CharField(max_length=255, blank=True, null=True, help_text="Locality/Area/Street")
+    pincode = models.CharField(max_length=20, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+
+    # Vendor/Owner (optional – vendor name comes from user; address if different from store)
+    owner_gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    vendor_house_no = models.CharField(max_length=255, blank=True, null=True)
+    vendor_locality_street = models.CharField(max_length=255, blank=True, null=True)
+    vendor_pincode = models.CharField(max_length=20, blank=True, null=True)
+    vendor_state = models.CharField(max_length=100, blank=True, null=True)
+    vendor_city = models.CharField(max_length=100, blank=True, null=True)
+
     latitude = models.DecimalField(max_digits=50, decimal_places=6, blank=True, null=True)
     longitude = models.DecimalField(max_digits=50, decimal_places=6, blank=True, null=True)
     is_location = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     is_online = models.BooleanField(default=False)
-    is_offline = models.BooleanField(default=False)
-    display_as_catalog = models.BooleanField(default=False)
-    private_catalog = models.BooleanField(default=False)
-    
+
+
+class StoreCoverMedia(models.Model):
+    """Store cover photos or videos (multiple). Each item is either image or video."""
+    MEDIA_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+    ]
+    store = models.ForeignKey(
+        vendor_store,
+        on_delete=models.CASCADE,
+        related_name="cover_media",
+    )
+    media_type = models.CharField(
+        max_length=10,
+        choices=MEDIA_TYPE_CHOICES,
+        default='image',
+        help_text="Photo or video",
+    )
+    media = models.FileField(upload_to="store/cover_media/", help_text="Cover photo or video file")
+    order = models.PositiveIntegerField(default=0, help_text="Display order (lower first)")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"Cover media #{self.order} for {self.store.name}"
+
 
 class Reel(models.Model):
     
@@ -174,6 +228,17 @@ class product(models.Model):
         return self.stock or 0
 
 
+class SpotlightProduct(models.Model):
+    """Vendor spotlight: product + optional discount tag for display."""
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, null=True, blank=True, related_name="spotlight_products")
+    product = models.ForeignKey("product", on_delete=models.CASCADE, related_name="spotlight_entries")
+    discount_tag = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.product.name
 
 
 class DeliveryBoy(models.Model):
@@ -217,4 +282,53 @@ class Offer(models.Model):
 
     def __str__(self):
         return f"{self.heading} - {self.seller.username}"
+
+
+class StoreOffer(models.Model):
+    """Promotional offer (Create Offer form): title, description, type (Discount % / Free Delivery), valid from/to, discount value, applicable products/categories, eligibility."""
+
+    ELIGIBILITY_CHOICES = [
+        ('first_time_buy', 'For first time buy'),
+        ('existing_buyers', 'For existing buyers'),
+        ('all', 'For all'),
+    ]
+
+    user = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="store_offers",
+    )
+    offer_title = models.CharField(max_length=255)
+    offer_description = models.TextField(blank=True, null=True)
+    is_discount_percent = models.BooleanField(default=False)   # Offer type: Discount %
+    is_free_delivery = models.BooleanField(default=False)       # Offer type: Free Delivery
+    valid_from = models.DateField(blank=True, null=True)
+    valid_to = models.DateField(blank=True, null=True)
+    discount_value = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Percentage when offer type is Discount %",
+    )
+    eligibility_criteria = models.CharField(
+        max_length=20,
+        choices=ELIGIBILITY_CHOICES,
+        default='all',
+    )
+    applicable_products = models.ManyToManyField(
+        "product",
+        blank=True,
+        related_name="store_offers",
+    )
+    applicable_categories = models.ManyToManyField(
+        "masters.product_category",
+        blank=True,
+        related_name="store_offers",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.offer_title
 

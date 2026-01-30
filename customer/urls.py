@@ -51,6 +51,8 @@ path('products/search/', ProductSearchAPIView.as_view(), name='search-products')
 
 path('stores-by-category/', StoreByCategoryView.as_view(), name='stores-by-category'),
 path('home/', CustomerHomeScreenAPIView.as_view(), name='customer_home_screen'),
+path('top-picks/', TopPicksAPIView.as_view(), name='customer_top_picks'),
+path('spotlight-products/', SpotlightProductsAPIView.as_view(), name='customer_spotlight_products'),
 path('main-categories/', MainCategoriesListAPIView.as_view(), name='customer_main_categories'),
 path('main-categories/<int:main_category_id>/categories-tree/', CategoriesTreeByMainCategoryAPIView.as_view(), name='customer_categories_tree'),
 path('categories/', CategoriesListAPIView.as_view(), name='customer_categories'),

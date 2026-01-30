@@ -9,7 +9,7 @@ from users.models import *
 
 from rest_framework import viewsets, permissions
 from vendor.models import *
-from vendor.serializers import BannerCampaignSerializer, ReelSerializer, VendorStoreSerializer, coupon_serializer
+from vendor.serializers import BannerCampaignSerializer, ReelSerializer, VendorStoreSerializer, coupon_serializer, OfferSerializer, StoreOfferSerializer
 from .models import *
 from .serializers import AddressSerializer, CartSerializer, OrderSerializer
 
@@ -50,6 +50,7 @@ from rest_framework import generics, mixins, filters
 
 
 from .serializers import VendorStoreLiteSerializer
+from django.db.models import Case, When, Value, IntegerField
 
 class VendorStoreListAPIView(mixins.ListModelMixin,
                              mixins.RetrieveModelMixin,
@@ -62,6 +63,51 @@ class VendorStoreListAPIView(mixins.ListModelMixin,
 
     def get_serializer_context(self):
         return {"request": self.request}  # ✅ needed for following field
+
+    def get_queryset(self):
+        qs = vendor_store.objects.filter(is_active=True)
+        # Sort by distance (nearby) when user location is available
+        user = self.request.user
+        user_lat, user_lon = None, None
+        if user.is_authenticated:
+            default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+            if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+                try:
+                    user_lat = float(default_address_obj.latitude)
+                    user_lon = float(default_address_obj.longitude)
+                except (TypeError, ValueError):
+                    pass
+        req_lat = self.request.query_params.get("latitude")
+        req_lon = self.request.query_params.get("longitude")
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+        if user_lat is not None and user_lon is not None:
+            stores = list(
+                vendor_store.objects.filter(
+                    is_active=True,
+                    latitude__isnull=False,
+                    longitude__isnull=False,
+                ).only("id", "latitude", "longitude")
+            )
+            if stores:
+                store_distances = []
+                for s in stores:
+                    try:
+                        d = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
+                    except (TypeError, ValueError):
+                        d = 999999
+                    store_distances.append((s.id, d))
+                store_distances.sort(key=lambda x: x[1])
+                ordered_ids = [sid for sid, _ in store_distances]
+                whens = [When(id=sid, then=Value(i)) for i, sid in enumerate(ordered_ids)]
+                qs = qs.annotate(
+                    _nearby_order=Case(*whens, default=Value(999999), output_field=IntegerField())
+                ).order_by("_nearby_order", "id")
+        return qs
 
     def get(self, request, *args, **kwargs):
         if "id" in kwargs:
@@ -78,7 +124,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from vendor.filters import ProductFilter
 
 
-from django.db.models import Exists, OuterRef, Value, BooleanField
+from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, IntegerField
 
 
 class ListProducts(ListAPIView):
@@ -89,23 +135,48 @@ class ListProducts(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = product.objects.filter(
-            is_active=True,
-        )
+        qs = product.objects.filter(is_active=True)
 
-        # Filter by customer pincode
-          # Get pincode from ?pincode=XXXX in URL
-        city = user.city
+        # Order by nearby: use request.user's location (default address or ?latitude=&longitude=)
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        req_lat = self.request.query_params.get("latitude")
+        req_lon = self.request.query_params.get("longitude")
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
 
-        if city:
-            qs = qs.filter(user__coverages__city__code=city)
-
-        # # Annotate favourites
-        # if user.is_authenticated:
-        #     favs = Favourite.objects.filter(user=user, product=OuterRef('pk'))
-        #     qs = qs.annotate(is_favourite=Exists(favs))
-        # else:
-        #     qs = qs.annotate(is_favourite=Value(False, output_field=BooleanField()))
+        if user_lat is not None and user_lon is not None:
+            stores = list(
+                vendor_store.objects.filter(
+                    is_active=True,
+                    latitude__isnull=False,
+                    longitude__isnull=False,
+                ).only("id", "user_id", "latitude", "longitude")
+            )
+            if stores:
+                store_distances = []
+                for s in stores:
+                    try:
+                        d = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
+                    except (TypeError, ValueError):
+                        d = 999999
+                    store_distances.append((s.user_id, d))
+                store_distances.sort(key=lambda x: x[1])
+                ordered_user_ids = [uid for uid, _ in store_distances]
+                whens = [When(user_id=uid, then=Value(i)) for i, uid in enumerate(ordered_user_ids)]
+                qs = qs.annotate(
+                    _nearby_order=Case(*whens, default=Value(999999), output_field=IntegerField())
+                ).order_by("_nearby_order", "id")
 
         return qs.distinct()
     
@@ -216,12 +287,25 @@ class CartViewSet(viewsets.ModelViewSet):
         product_instance = serializer.validated_data["product"]
         quantity = serializer.validated_data.get("quantity", 1)
 
-        # ✅ Create or update cart item, tracking store
         try:
             from vendor.models import vendor_store as VendorStore
             store = VendorStore.objects.filter(user=product_instance.user).first()
         except Exception:
             store = None
+
+        # Enforce same-store cart: cart may only contain products from one store
+        existing_cart = Cart.objects.filter(user=self.request.user).select_related("product").exclude(product=product_instance)
+        if existing_cart.exists():
+            first_item = existing_cart.first()
+            try:
+                cart_store = VendorStore.objects.filter(user=first_item.product.user).first()
+            except Exception:
+                cart_store = getattr(first_item, "store", None)
+            new_store = store
+            if cart_store is not None and new_store is not None and cart_store.id != new_store.id:
+                raise serializers.ValidationError(
+                    "Your cart contains products from another store. Clear the cart or complete the order before adding products from a different store."
+                )
 
         cart_item, created = Cart.objects.get_or_create(
             user=self.request.user,
@@ -230,11 +314,9 @@ class CartViewSet(viewsets.ModelViewSet):
         )
         if not created:
             cart_item.quantity += quantity
-            if cart_item.store_id is None and store is not None:
+            if getattr(cart_item, "store_id", None) is None and store is not None:
                 cart_item.store = store
             cart_item.save()
-
-        # print features removed
 
         return cart_item
 
@@ -403,11 +485,23 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
 
 
 class offersView(APIView):
+    """GET: List active store offers (promotional: discount %, free delivery, etc.) currently valid for the customer."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        products = Reel.objects.all()
-        serializer = ReelSerializer(products, many=True)
+        from django.utils import timezone as tz
+        from django.db.models import Q
+        from vendor.models import StoreOffer
+        today = tz.now().date()
+        # Active store offers valid today (valid_from <= today, valid_to >= today or null)
+        offers_qs = StoreOffer.objects.filter(
+            is_active=True
+        ).filter(
+            Q(valid_from__isnull=True) | Q(valid_from__lte=today)
+        ).filter(
+            Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+        ).prefetch_related("applicable_products", "applicable_categories").order_by("-created_at")
+        serializer = StoreOfferSerializer(offers_qs, many=True, context={"request": request})
         return Response(serializer.data)
     
 
@@ -872,6 +966,116 @@ class CustomerHomeScreenAPIView(APIView):
             "featured_collection": featured_collection,
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class TopPicksAPIView(APIView):
+    """
+    GET /customer/top-picks/ — products with is_popular=True.
+    Same structure as home top_picks: product data + store_name, store_id, distance_km, discount_percent.
+    User location for distance_km comes from request.user's default address. Query params: limit (default 20), offset (default 0).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=request.user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        limit = min(int(request.query_params.get("limit", 20)), 100)
+        offset = max(0, int(request.query_params.get("offset", 0)))
+
+        stores_list = list(
+            vendor_store.objects.filter(is_active=True).only(
+                "id", "user_id", "name", "latitude", "longitude"
+            )
+        )
+        store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
+
+        products_top_picks = (
+            product.objects.filter(is_active=True, is_popular=True)
+            .select_related("user", "category", "sub_category")
+            .order_by("-id")[offset : offset + limit]
+        )
+        top_picks = []
+        for p in products_top_picks:
+            store = store_by_user_id.get(p.user_id) if p.user_id else None
+            distance_km = None
+            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+            discount_percent = None
+            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+            prod_data = product_serializer(p, context={"request": request}).data
+            if isinstance(prod_data, dict):
+                prod_data["store_name"] = store.name if store else None
+                prod_data["store_id"] = store.id if store else None
+                prod_data["distance_km"] = distance_km
+                prod_data["discount_percent"] = discount_percent
+            top_picks.append(prod_data)
+
+        return Response({"top_picks": top_picks}, status=status.HTTP_200_OK)
+
+
+class SpotlightProductsAPIView(APIView):
+    """
+    GET /customer/spotlight-products/ — spotlight products (vendor-picked) with product data, store_name, store_id, distance_km, discount_tag.
+    User location for distance_km from request.user's default address. Query params: limit (default 20), offset (default 0).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from vendor.models import SpotlightProduct
+
+        user = request.user
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        limit = min(int(request.query_params.get("limit", 20)), 100)
+        offset = max(0, int(request.query_params.get("offset", 0)))
+
+        stores_list = list(
+            vendor_store.objects.filter(is_active=True).only(
+                "id", "user_id", "name", "latitude", "longitude"
+            )
+        )
+        store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
+
+        spotlight_qs = (
+            SpotlightProduct.objects.filter(product__is_active=True)
+            .select_related("product", "user")
+            .order_by("-id")[offset : offset + limit]
+        )
+        results = []
+        for sp in spotlight_qs:
+            p = sp.product
+            store = store_by_user_id.get(p.user_id) if p.user_id else None
+            distance_km = None
+            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
+                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+            discount_percent = None
+            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
+                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
+            prod_data = product_serializer(p, context={"request": request}).data
+            if isinstance(prod_data, dict):
+                prod_data["store_name"] = store.name if store else None
+                prod_data["store_id"] = store.id if store else None
+                prod_data["distance_km"] = distance_km
+                prod_data["discount_percent"] = discount_percent
+                prod_data["discount_tag"] = sp.discount_tag
+                prod_data["spotlight_id"] = sp.id
+            results.append(prod_data)
+
+        return Response({"spotlight_products": results}, status=status.HTTP_200_OK)
 
 
 class MainCategoriesListAPIView(APIView):

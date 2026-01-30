@@ -107,3 +107,29 @@ class DeviceToken(models.Model):
 
     def __str__(self):
         return f"DeviceToken for {self.user_id}"
+
+
+class KYC(models.Model):
+    """Tax & KYC Verification: GST, PAN, bank details; Upload documents (GST, PAN, address proof, bank proof)."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="kyc")
+    # Tax & KYC Verification (data entry)
+    gst = models.CharField(max_length=50, blank=True, null=True, help_text="GST (Mandatory for selling, unless exempted)")
+    pan_card_number = models.CharField(max_length=20, blank=True, null=True)
+    # Bank details
+    bank_account_number = models.CharField(max_length=50, blank=True, null=True)
+    account_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    ifsc_code = models.CharField(max_length=20, blank=True, null=True)
+    # Upload documents (scanned copies)
+    gst_document = models.FileField(upload_to="kyc/gst/", blank=True, null=True, help_text="GST (Scanned Copy)")
+    pan_card_document = models.FileField(upload_to="kyc/pan/", blank=True, null=True, help_text="Pan card (Scanned Copy)")
+    address_proof_document = models.FileField(upload_to="kyc/address_proof/", blank=True, null=True, help_text="Address Proof (Scanned Copy)")
+    bank_proof_document = models.FileField(upload_to="kyc/bank_proof/", blank=True, null=True, help_text="Bank Proof (Scanned Copy)")
+    # Status
+    is_verified = models.BooleanField(default=False)
+    verified_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"KYC for {self.user}"

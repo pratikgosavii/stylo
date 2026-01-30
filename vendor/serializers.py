@@ -197,40 +197,100 @@ class ReelSerializer(serializers.ModelSerializer):
     
 from django.utils import timezone
 
+
+class StoreCoverMediaSerializer(serializers.ModelSerializer):
+    """Single cover photo or video (image/video file)."""
+    media_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = StoreCoverMedia
+        fields = ['id', 'store', 'media_type', 'media', 'media_url', 'order', 'created_at']
+        read_only_fields = ['store', 'created_at']
+
+    def get_media_url(self, obj):
+        request = self.context.get('request')
+        if obj.media and request:
+            return request.build_absolute_uri(obj.media.url)
+        return obj.media.url if obj.media else None
+
+
 class VendorStoreSerializer(serializers.ModelSerializer):
     # Nested child serializers
     reels = ReelSerializer(source='user.reel_set', many=True, read_only=True)
     banners = BannerCampaignSerializer(source='user.banners', many=True, read_only=True)
+    # Multiple cover photos and multiple cover videos (separate lists)
+    cover_photos = serializers.SerializerMethodField(read_only=True)
+    cover_videos = serializers.SerializerMethodField(read_only=True)
+    cover_photos_videos = StoreCoverMediaSerializer(source='cover_media', many=True, read_only=True)
 
-    is_store_open = serializers.SerializerMethodField() 
     store_rating = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
+    vendor_name = serializers.SerializerMethodField(read_only=True)
+    spotlight_products = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = vendor_store
         fields = [
             'id', 'user',
-            'working_hours',
-            'spotlight_products',
+            'vendor_name',
             'name',
             'about',
+            'business_type',
             'profile_image',
             'banner_image',
+            'cover_photos',
+            'cover_videos',
+            'cover_photos_videos',
+            'store_mobile',
+            'store_email',
+            'house_building_no',
+            'locality_street',
+            'pincode',
+            'state',
+            'city',
+            'owner_gender',
+            'vendor_house_no',
+            'vendor_locality_street',
+
+            'vendor_pincode',
+            'vendor_state',
+            'vendor_city',
             'reels',
             'banners',
+            'spotlight_products',
             'storetag',
             'latitude',
             'longitude',
             'is_location',
             'is_active',
             'is_online',
-            'is_store_open',
-            'is_offline',
-            'display_as_catalog',
-            'private_catalog',
             'store_rating',
             'reviews',
         ]
+
+    def get_vendor_name(self, obj):
+        """Vendor/owner name from linked User (first_name + last_name)."""
+        if not obj.user:
+            return None
+        parts = [obj.user.first_name, obj.user.last_name]
+        return " ".join(p for p in parts if p).strip() or None
+
+    def get_cover_photos(self, obj):
+        """Multiple cover photos (media_type=image), ordered."""
+        qs = obj.cover_media.filter(media_type='image').order_by('order', 'id')
+        return StoreCoverMediaSerializer(qs, many=True, context=self.context).data
+
+    def get_cover_videos(self, obj):
+        """Multiple cover videos (media_type=video), ordered."""
+        qs = obj.cover_media.filter(media_type='video').order_by('order', 'id')
+        return StoreCoverMediaSerializer(qs, many=True, context=self.context).data
+
+    def get_spotlight_products(self, obj):
+        """Spotlight products for this store (via store's user)."""
+        if not obj.user:
+            return []
+        qs = obj.user.spotlight_products.all().select_related('product').order_by('id')
+        return SpotlightProductSerializer(qs, many=True, context=self.context).data
 
     def get_store_rating(self, obj):
         """Average product rating for this store (all reviews, visible or not)."""
@@ -286,4 +346,84 @@ class OfferSerializer(serializers.ModelSerializer):
                 return VendorStoreSerializer2(store).data
         except:
             return None
-        
+
+
+class StoreOfferSerializer(serializers.ModelSerializer):
+    """Create Offer form: title, description, offer type (Discount % / Free Delivery), valid from/to, discount value, applicable products/categories, eligibility."""
+
+    offer_type = serializers.SerializerMethodField(read_only=True)
+    applicable_products = serializers.PrimaryKeyRelatedField(many=True, queryset=product.objects.all(), required=False, allow_empty=True)
+    applicable_categories = serializers.PrimaryKeyRelatedField(many=True, queryset=product_category.objects.all(), required=False, allow_empty=True)
+
+    class Meta:
+        model = StoreOffer
+        fields = [
+            'id', 'user',
+            'offer_title', 'offer_description',
+            'offer_type', 'is_discount_percent', 'is_free_delivery',
+            'valid_from', 'valid_to', 'discount_value',
+            'applicable_products', 'applicable_categories',
+            'eligibility_criteria', 'is_active', 'created_at',
+        ]
+        read_only_fields = ['user', 'created_at']
+
+    def get_offer_type(self, obj):
+        if obj.is_free_delivery:
+            return 'free_delivery'
+        if obj.is_discount_percent:
+            return 'discount_percent'
+        return 'discount_percent'
+
+    def validate(self, attrs):
+        offer_type = self.initial_data.get('offer_type')
+        if offer_type == 'free_delivery':
+            attrs['is_free_delivery'] = True
+            attrs['is_discount_percent'] = False
+        elif offer_type == 'discount_percent':
+            attrs['is_discount_percent'] = True
+            attrs['is_free_delivery'] = False
+        return attrs
+
+    def create(self, validated_data):
+        products = validated_data.pop('applicable_products', [])
+        categories = validated_data.pop('applicable_categories', [])
+        offer = StoreOffer.objects.create(**validated_data)
+        if products:
+            offer.applicable_products.set(products)
+        if categories:
+            offer.applicable_categories.set(categories)
+        return offer
+
+    def update(self, instance, validated_data):
+        products = validated_data.pop('applicable_products', None)
+        categories = validated_data.pop('applicable_categories', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if products is not None:
+            instance.applicable_products.set(products)
+        if categories is not None:
+            instance.applicable_categories.set(categories)
+        return instance
+
+
+class SpotlightProductSerializer(serializers.ModelSerializer):
+    """Spotlight product: product + discount_tag for vendor."""
+    product_details = product_serializer(source='product', read_only=True)
+
+    class Meta:
+        model = SpotlightProduct
+        fields = ['id', 'user', 'product', 'product_details', 'discount_tag']
+        read_only_fields = ['user']
+
+    def validate_product(self, value):
+        # Ensure product belongs to the vendor (request.user)
+        request = self.context.get('request')
+        if request and value.user_id != request.user.id:
+            raise serializers.ValidationError("You can only add your own products to spotlight.")
+        return value
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+

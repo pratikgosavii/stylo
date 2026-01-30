@@ -24,6 +24,8 @@ router.register(r'deliveryboys', DeliveryBoyViewSet, basename='deliveryboys')
 router.register(r'orders', OrderViewSet, basename='orders')
 
 router.register(r'offer', OfferViewSet, basename="offer")
+router.register(r'store-offers', StoreOfferViewSet, basename="store-offer")
+router.register(r'spotlight-products', SpotlightProductViewSet, basename='spotlight-product')
 
 
 urlpatterns = [
