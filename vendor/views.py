@@ -55,23 +55,28 @@ class VendorStoreAPIView(APIView):
             return Response({"detail": "Store not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request):
-        """Update the logged-in vendor's store. Same API accepts cover_photos and cover_videos (multiple files each)."""
+        """Update the logged-in vendor's store. Same API accepts cover_media (multiple files). Type inferred from Content-Type."""
         try:
             store = vendor_store.objects.get(user=request.user)
             serializer = VendorStoreSerializer(store, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save(user=request.user)
-                # Handle cover photos/videos in same request (multipart: cover_photos[], cover_videos[])
-                cover_photos = request.FILES.getlist('cover_photos') or request.FILES.getlist('cover_photos[]')
-                cover_videos = request.FILES.getlist('cover_videos') or request.FILES.getlist('cover_videos[]')
-                if cover_photos:
-                    store.cover_media.filter(media_type='image').delete()
-                    for i, f in enumerate(cover_photos):
-                        StoreCoverMedia.objects.create(store=store, media_type='image', media=f, order=i)
-                if cover_videos:
-                    store.cover_media.filter(media_type='video').delete()
-                    for i, f in enumerate(cover_videos):
-                        StoreCoverMedia.objects.create(store=store, media_type='video', media=f, order=i)
+                # Single key: cover_media; or legacy cover_photos + cover_videos. Type inferred from Content-Type.
+                files = request.FILES.getlist('cover_media') or request.FILES.getlist('cover_media[]')
+                if not files:
+                    cover_photos = request.FILES.getlist('cover_photos') or request.FILES.getlist('cover_photos[]')
+                    cover_videos = request.FILES.getlist('cover_videos') or request.FILES.getlist('cover_videos[]')
+                    for f in cover_photos:
+                        files.append((f, 'image'))
+                    for f in cover_videos:
+                        files.append((f, 'video'))
+                else:
+                    files = [(f, 'video' if (getattr(f, 'content_type', '') or '').lower().startswith('video/') else 'image') for f in files]
+                if files:
+                    store.cover_media.all().delete()
+                    for i, item in enumerate(files):
+                        f, media_type = item if isinstance(item, tuple) else (item, 'image')
+                        StoreCoverMedia.objects.create(store=store, media_type=media_type, media=f, order=i)
                 out = VendorStoreSerializer(store, context={'request': request}).data
                 return Response(out, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

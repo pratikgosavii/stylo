@@ -218,10 +218,8 @@ class VendorStoreSerializer(serializers.ModelSerializer):
     # Nested child serializers
     reels = ReelSerializer(source='user.reel_set', many=True, read_only=True)
     banners = BannerCampaignSerializer(source='user.banners', many=True, read_only=True)
-    # Multiple cover photos and multiple cover videos (separate lists)
-    cover_photos = serializers.SerializerMethodField(read_only=True)
-    cover_videos = serializers.SerializerMethodField(read_only=True)
-    cover_photos_videos = StoreCoverMediaSerializer(source='cover_media', many=True, read_only=True)
+    # Single combined list of cover media (photos + videos); each item has media_type
+    cover_media = serializers.SerializerMethodField(read_only=True)
 
     store_rating = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
@@ -238,9 +236,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'business_type',
             'profile_image',
             'banner_image',
-            'cover_photos',
-            'cover_videos',
-            'cover_photos_videos',
+            'cover_media',
             'store_mobile',
             'store_email',
             'house_building_no',
@@ -275,14 +271,9 @@ class VendorStoreSerializer(serializers.ModelSerializer):
         parts = [obj.user.first_name, obj.user.last_name]
         return " ".join(p for p in parts if p).strip() or None
 
-    def get_cover_photos(self, obj):
-        """Multiple cover photos (media_type=image), ordered."""
-        qs = obj.cover_media.filter(media_type='image').order_by('order', 'id')
-        return StoreCoverMediaSerializer(qs, many=True, context=self.context).data
-
-    def get_cover_videos(self, obj):
-        """Multiple cover videos (media_type=video), ordered."""
-        qs = obj.cover_media.filter(media_type='video').order_by('order', 'id')
+    def get_cover_media(self, obj):
+        """Cover photos and videos combined, each item has media_type ('image' or 'video')."""
+        qs = obj.cover_media.all().order_by('order', 'id')
         return StoreCoverMediaSerializer(qs, many=True, context=self.context).data
 
     def get_spotlight_products(self, obj):

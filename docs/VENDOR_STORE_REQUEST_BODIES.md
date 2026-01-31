@@ -1,6 +1,6 @@
 # Vendor Store – Full Request Bodies
 
-One API: **PUT /vendor/vendor-stores/** for store + **cover_photos** / **cover_videos** (multiple files in same request). Raw body = JSON (no files); media = multipart/form-data (store fields + profile_image, banner_image, cover_photos, cover_videos).
+One API: **PUT /vendor/vendor-stores/** for store + **cover_media** (multiple files). Raw body = JSON (no files); media = multipart/form-data (store fields + profile_image, banner_image, cover_media). Photo vs video inferred from file Content-Type.
 
 ---
 
@@ -75,7 +75,7 @@ Use when sending only text/numbers (no images). Omit file fields or send `null`.
 
 ### 1.2 Media agent body (multipart/form-data)
 
-Use when uploading **profile_image**, **banner_image**, and/or **cover_photos** / **cover_videos**. All in the same PUT.
+Use when uploading **profile_image**, **banner_image**, and/or **cover_media**. All in the same PUT.
 
 **Content-Type:** `multipart/form-data`
 
@@ -88,8 +88,7 @@ Use when uploading **profile_image**, **banner_image**, and/or **cover_photos** 
 | `business_type` | text | Business type |
 | `profile_image` | **file** | Store logo (image) |
 | `banner_image` | **file** | Store banner (image) |
-| `cover_photos` or `cover_photos[]` | **file (multiple)** | Cover photos – send one key per file or multiple files under same key; replaces existing cover photos |
-| `cover_videos` or `cover_videos[]` | **file (multiple)** | Cover videos – same as above; replaces existing cover videos |
+| `cover_media` or `cover_media[]` | **file (multiple)** | Cover photos + videos; type inferred from Content-Type (image/* → image, video/* → video); replaces all existing cover media |
 | `store_mobile` | text | Store mobile |
 | `store_email` | text | Store email |
 | `house_building_no` | text | House/Building no. |
@@ -222,9 +221,7 @@ true
 
 - `id`, `user`
 - `vendor_name` (from user first_name + last_name)
-- `cover_photos` (list of cover media with `media_type=image`)
-- `cover_videos` (list of cover media with `media_type=video`)
-- `cover_photos_videos` (combined list)
+- `cover_media` (list of cover photos and videos; each item has `media_type`: `"image"` or `"video"`)
 - `reels`, `banners`
 - `store_rating`, `reviews`
 
