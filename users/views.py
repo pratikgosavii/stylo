@@ -644,20 +644,44 @@ class UserProfileViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
+    def _get_profile_completed(self, user):
+        """For vendors: True if vendor_store exists and has key fields filled. Else True for non-vendors."""
+        if not getattr(user, "is_vendor", False):
+            return True
+        try:
+            store = vendor_store.objects.get(user=user)
+        except vendor_store.DoesNotExist:
+            return False
+        # Check key vendor_store fields are present
+        key_fields = [
+            "name", "profile_image", "city", "pincode", "business_type",
+            "house_building_no", "locality_street", "state",
+            "vendor_house_no", "vendor_locality_street", "vendor_pincode", "vendor_state", "vendor_city",
+            "latitude", "longitude",
+        ]
+        for field in key_fields:
+            val = getattr(store, field, None)
+            if val is None or (isinstance(val, str) and not val.strip()):
+                return False
+        return True
+
     @action(detail=False, methods=['get', 'put'], url_path='me')
     def me(self, request):
         user = request.user
 
         if request.method == 'GET':
             serializer = UserProfileSerializer(user)
-            return Response(serializer.data)
+            data = dict(serializer.data)
+            data["profile_completed"] = self._get_profile_completed(user)
+            return Response(data)
 
         elif request.method == 'PUT':
-
             serializer = UserProfileSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data)
+                data = dict(serializer.data)
+                data["profile_completed"] = self._get_profile_completed(user)
+                return Response(data)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
