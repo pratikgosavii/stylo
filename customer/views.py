@@ -287,22 +287,12 @@ class CartViewSet(viewsets.ModelViewSet):
         product_instance = serializer.validated_data["product"]
         quantity = serializer.validated_data.get("quantity", 1)
 
-        try:
-            from vendor.models import vendor_store as VendorStore
-            store = VendorStore.objects.filter(user=product_instance.user).first()
-        except Exception:
-            store = None
-
-        # Enforce same-store cart: cart may only contain products from one store
+        # Enforce same-store cart: cart may only contain products from one vendor (user)
         existing_cart = Cart.objects.filter(user=self.request.user).select_related("product").exclude(product=product_instance)
         if existing_cart.exists():
             first_item = existing_cart.first()
-            try:
-                cart_store = VendorStore.objects.filter(user=first_item.product.user).first()
-            except Exception:
-                cart_store = None
-            new_store = store
-            if cart_store is not None and new_store is not None and cart_store.id != new_store.id:
+            # Compare vendor user_id directly (each store has one user)
+            if first_item.product.user_id != product_instance.user_id:
                 raise serializers.ValidationError(
                     "Your cart contains products from another store. Clear the cart or complete the order before adding products from a different store."
                 )
