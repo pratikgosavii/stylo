@@ -178,7 +178,7 @@ class product(models.Model):
     cgst_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     # Stock
-    serial_numbers = models.DecimalField(max_digits=30, decimal_places=0)
+    serial_numbers = models.CharField(max_length=100, blank=True, null=True)
     opening_stock = models.IntegerField(null=True, blank=True)
     stock = models.IntegerField(null=True, blank=True)
 
