@@ -44,6 +44,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, OTP, DeviceToken
 from .otp_utils import create_and_send_otp, verify_otp, normalize_mobile
+from vendor.models import vendor_store
 
 
 class SendOTPView(APIView):
@@ -221,15 +222,21 @@ class LoginAPIView(APIView):
                     user.is_active = True
                     user.save()
             else:
-                is_vendor = request.data.get("user_type") == "vendor"
-                is_customer = request.data.get("user_type") == "customer"
+                user_type = request.data.get("user_type")
+                is_vendor = user_type == "vendor"
+                is_customer = user_type == "customer"
+                is_deliveryboy = user_type == "deliveryboy"
                 user = User.objects.create(
                     mobile=mobile,
                     is_active=True,
                     is_vendor=is_vendor,
                     is_customer=is_customer,
+                    is_deliveryboy=is_deliveryboy,
                 )
                 created = True
+                if user_type == "vendor":
+                    vendor_store.objects.create(user=user, name="My Store")
+                    print("-------16------------ vendor_store created")
 
             # Token creation
             refresh = RefreshToken.for_user(user)
@@ -240,7 +247,7 @@ class LoginAPIView(APIView):
             if user.is_vendor:
                 is_subscribed = user.subscription_is_active
 
-            role = "vendor" if user.is_vendor else ("customer" if user.is_customer else "user")
+            role = "vendor" if user.is_vendor else ("customer" if user.is_customer else ("deliveryboy" if getattr(user, "is_deliveryboy", False) else "user"))
             return Response({
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
