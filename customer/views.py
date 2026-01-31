@@ -300,7 +300,7 @@ class CartViewSet(viewsets.ModelViewSet):
             try:
                 cart_store = VendorStore.objects.filter(user=first_item.product.user).first()
             except Exception:
-                cart_store = getattr(first_item, "store", None)
+                cart_store = None
             new_store = store
             if cart_store is not None and new_store is not None and cart_store.id != new_store.id:
                 raise serializers.ValidationError(
@@ -310,12 +310,10 @@ class CartViewSet(viewsets.ModelViewSet):
         cart_item, created = Cart.objects.get_or_create(
             user=self.request.user,
             product=product_instance,
-            defaults={"quantity": quantity, "store": store},
+            defaults={"quantity": quantity},
         )
         if not created:
             cart_item.quantity += quantity
-            if getattr(cart_item, "store_id", None) is None and store is not None:
-                cart_item.store = store
             cart_item.save()
 
         return cart_item
