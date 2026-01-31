@@ -654,7 +654,7 @@ class UserProfileViewSet(viewsets.ViewSet):
             return False
         # Check key vendor_store fields are present
         key_fields = [
-            "name", "profile_image", "city", "pincode", "business_type",
+            "name", "city", "pincode", "business_type",
             "house_building_no", "locality_street", "state",
             "vendor_house_no", "vendor_locality_street", "vendor_pincode", "vendor_state", "vendor_city",
             "latitude", "longitude",
