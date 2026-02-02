@@ -47,9 +47,6 @@ urlpatterns = [
     path('delete-bannercampaign/<bannercampaign_id>', delete_bannercampaign, name='delete_bannercampaign'),
     path('list-bannercampaign/', list_bannercampaign, name='list_bannercampaign'),
 
-    path('generate-barcode/', generate_barcode, name='generate_barcode'),
-
-
     path("delivery-boy/login/", DeliveryBoyLoginAPIView.as_view(), name="delivery-boy-login"),
     path("delivery-boy/logout/", DeliveryBoyLogoutAPIView.as_view(), name="delivery-boy-logout"),
 

@@ -8,8 +8,9 @@ from masters.models import MainCategory, product_category, product_subcategory, 
 from users.models import *
 
 from rest_framework import viewsets, permissions
+from vendor.models import vendor_store
 from vendor.models import *
-from vendor.serializers import BannerCampaignSerializer, ReelSerializer, VendorStoreSerializer, coupon_serializer, OfferSerializer, StoreOfferSerializer
+from vendor.serializers import BannerCampaignSerializer, ReelSerializer, VendorStoreSerializer, VendorStoreSerializer2, coupon_serializer, OfferSerializer, StoreOfferSerializer
 from .models import *
 from .serializers import AddressSerializer, CartSerializer, OrderSerializer
 
@@ -280,22 +281,44 @@ class CartViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return (
             Cart.objects.filter(user=self.request.user)
-            .select_related("product")
+            .select_related("product", "product__user")
         )
+
+    def list(self, request, *args, **kwargs):
+        """Return cart items grouped by store (vendor). GET /customer/cart/"""
+        queryset = self.get_queryset().order_by("product__user_id", "id")
+        cart_items = list(queryset)
+        if not cart_items:
+            return Response({"stores": []}, status=status.HTTP_200_OK)
+
+        # Distinct vendor user_ids from cart products
+        user_ids = list({getattr(item.product, "user_id", None) for item in cart_items if getattr(item.product, "user_id", None)})
+        stores_qs = vendor_store.objects.filter(user_id__in=user_ids, is_active=True)
+        store_by_user_id = {s.user_id: s for s in stores_qs}
+
+        # Group cart items by store (product.user_id)
+        from collections import defaultdict
+        by_store = defaultdict(list)
+        for item in cart_items:
+            uid = getattr(item.product, "user_id", None)
+            by_store[uid].append(item)
+
+        # Build response: list of { store, items } per store
+        stores_payload = []
+        for uid in user_ids:
+            items = by_store.get(uid) or []
+            if not items:
+                continue
+            store = store_by_user_id.get(uid)
+            store_data = VendorStoreSerializer2(store).data if store else {"user_id": uid, "name": "Store", "id": None}
+            items_data = [CartSerializer(it, context={"request": request}).data for it in items]
+            stores_payload.append({"store": store_data, "items": items_data})
+
+        return Response({"stores": stores_payload}, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         product_instance = serializer.validated_data["product"]
         quantity = serializer.validated_data.get("quantity", 1)
-
-        # Enforce same-store cart: cart may only contain products from one vendor (user)
-        existing_cart = Cart.objects.filter(user=self.request.user).select_related("product").exclude(product=product_instance)
-        if existing_cart.exists():
-            first_item = existing_cart.first()
-            # Compare vendor user_id directly (each store has one user)
-            if first_item.product.user_id != product_instance.user_id:
-                raise serializers.ValidationError(
-                    "Your cart contains products from another store. Clear the cart or complete the order before adding products from a different store."
-                )
 
         cart_item, created = Cart.objects.get_or_create(
             user=self.request.user,
@@ -308,11 +331,10 @@ class CartViewSet(viewsets.ModelViewSet):
 
         return cart_item
 
-    # ✅ Clear cart and add new product
     @action(detail=False, methods=["post"])
     @transaction.atomic
     def clear_and_add(self, request):
-        """Clears cart and adds new product (supports print job & file uploads)."""
+        """Clears cart and adds new product."""
         product_id = request.data.get("product")
         quantity = request.data.get("quantity", 1)
 
@@ -1337,11 +1359,9 @@ class HomeScreenView(APIView):
             ).select_related(
                 'user', 'category', 'sub_category'
             ).prefetch_related(
-                'variants',                           # product.variants (if you have related_name 'variants')
-                'variants__size',                     # size on variants
-                'print_variants',                     # PrintVariant (related_name)
-                'customize_print_variants',           # CustomizePrintVariant (related_name)
-                'user__vendor_store'                  # prefetch vendor_store of the user
+                'variants',
+                'variants__size',
+                'user__vendor_store'
             ).order_by('?')[:6]  # random 6 products for this main category
 
             products = list(products_qs)  # evaluate
@@ -1880,13 +1900,11 @@ class OrderPaymentSummaryAPIView(APIView):
         if missing:
             return Response({"error": "Some items not found", "missing_ids": missing}, status=404)
 
-        # Ensure all items belong to the same order and same vendor
+        # Ensure all items belong to the same order
         order_ids = {i.order_id for i in items}
         if len(order_ids) != 1:
             return Response({"error": "Items must belong to the same order"}, status=400)
         vendor_ids = {getattr(i.product, "user_id", None) for i in items}
-        if len(vendor_ids) != 1:
-            return Response({"error": "Items must belong to the same vendor"}, status=400)
 
         subtotal = Decimal("0.00")
         gst_total = Decimal("0.00")
@@ -1910,7 +1928,8 @@ class OrderPaymentSummaryAPIView(APIView):
 
         discount = Decimal("0.00")
         applied_coupon = None
-        if coupon_code:
+        # Apply coupon only when all selected items are from a single vendor
+        if coupon_code and len(vendor_ids) == 1:
             try:
                 from vendor.models import coupon as Coupon
                 now = dt.datetime.now(dt.timezone.utc)
