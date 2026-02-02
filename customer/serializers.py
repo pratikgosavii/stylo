@@ -75,8 +75,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
         return self._is_allowed_check(obj, 'exchange')
 
     def get_is_reviewed(self, obj):
-        user = self.context['request'].user  # logged-in user
-        return Review.objects.filter(order_item=obj, user=user).exists()
+        request = self.context.get("request")
+        if not request or not getattr(request, "user", None):
+            return False
+        return Review.objects.filter(order_item=obj, user=request.user).exists()
     
     
 class AddressSerializer(serializers.ModelSerializer):

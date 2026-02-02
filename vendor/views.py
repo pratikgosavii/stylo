@@ -342,7 +342,7 @@ class AssignDeliveryBoyAPIView(APIView):
                 item.status = "delivery_boy_assigned"
                 item.save(update_fields=["status"])
 
-        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
 def generate_barcode(request):
@@ -714,7 +714,7 @@ class CommonOrderStatusUpdateAPIView(APIView):
         else:
             order.save(update_fields=["status"])
 
-        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
 class ConfirmDeliveryByOTPAPIView(APIView):
@@ -751,7 +751,7 @@ class ConfirmDeliveryByOTPAPIView(APIView):
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])
 
-        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
         
@@ -843,23 +843,61 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
         mobile = (self.request.data.get("mobile") or "").strip()
         email = self.request.data.get("email") or ""
 
+        # Login identifier: use username if provided, else mobile (for login: send same value as "username")
+        login_identifier = username if username else mobile
+
         account_user = None
-        if username and password:
-            # Create login account: User uses mobile as USERNAME_FIELD, so we store username in mobile for delivery boy login
-            if User.objects.filter(mobile=username).exists():
+        if login_identifier and password:
+            # Create login account: User uses mobile as USERNAME_FIELD, so we store login_identifier in mobile for delivery boy login
+            if User.objects.filter(mobile=login_identifier).exists():
                 from rest_framework.exceptions import ValidationError
-                raise ValidationError({"username": "This username is already taken."})
+                raise ValidationError({"username": "This username/mobile is already taken for login."})
             account_user = User.objects.create_user(
-                mobile=username,
+                mobile=login_identifier,
                 password=password,
                 email=email or None,
             )
             account_user.is_deliveryboy = True
             account_user.save(update_fields=["is_deliveryboy"])
-        serializer.save(user=self.request.user, account_user=account_user, username=username or None, mobile=mobile, email=email)
+        serializer.save(user=self.request.user, account_user=account_user, username=username or mobile or None, mobile=mobile, email=email)
+
+    def perform_update(self, serializer):
+        from users.models import User
+        instance = serializer.instance
+        username = (self.request.data.get("username") or "").strip()
+        password = self.request.data.get("password")
+        mobile = (self.request.data.get("mobile") or instance.mobile or "").strip()
+        email = self.request.data.get("email", instance.email) or ""
+
+        login_identifier = username if username else mobile
+        account_user = getattr(instance, "account_user", None)
+
+        if login_identifier and password:
+            if account_user:
+                # Update existing login account - skip uniqueness check if login id unchanged (e.g. only updating password)
+                if login_identifier != account_user.mobile:
+                    if User.objects.filter(mobile=login_identifier).exists():
+                        from rest_framework.exceptions import ValidationError
+                        raise ValidationError({"username": "This username/mobile is already taken for login."})
+                account_user.mobile = login_identifier
+                account_user.set_password(password)
+                account_user.email = email or None
+                account_user.save(update_fields=["mobile", "password", "email"])
+            else:
+                # Create login account (was created without one)
+                if User.objects.filter(mobile=login_identifier).exists():
+                    from rest_framework.exceptions import ValidationError
+                    raise ValidationError({"username": "This username/mobile is already taken for login."})
+                account_user = User.objects.create_user(mobile=login_identifier, password=password, email=email or None)
+                account_user.is_deliveryboy = True
+                account_user.save(update_fields=["is_deliveryboy"])
+
+        save_kwargs = {"username": username or mobile or instance.username, "mobile": mobile, "email": email}
+        if account_user is not None and not getattr(instance, "account_user_id", None):
+            save_kwargs["account_user"] = account_user
+        serializer.save(**save_kwargs)
 
 
-    
 class OfferViewSet(viewsets.ModelViewSet):
     serializer_class = OfferSerializer
     permission_classes = [permissions.IsAuthenticated]
