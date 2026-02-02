@@ -184,12 +184,22 @@ class Order(models.Model):
     delivery_boy = models.ForeignKey("vendor.DeliveryBoy", null=True, blank=True, on_delete=models.SET_NULL, related_name="assigned_orders")
     created_at = models.DateTimeField(auto_now=True)
 
+    # Cancellation reasons (when customer cancels after trial)
+    cancel_size_doesnt_fit = models.BooleanField(default=False)
+    cancel_color_looks_different = models.BooleanField(default=False)
+    cancel_material_quality_not_expected = models.BooleanField(default=False)
+    cancel_style_doesnt_suit = models.BooleanField(default=False)
+    cancel_other = models.BooleanField(default=False)
+    cancel_other_reason = models.TextField(blank=True, null=True, help_text="Text reason when 'other' is selected")
+
     
     
 
 class OrderItem(models.Model):
     STATUS_CHOICES = [
+        ('trial', 'Trial'),
         ('ordered', 'Ordered'),
+        ('cancelled', 'Cancelled'),
         ('returned', 'Returned'),
         ('replace', 'Replace'),
     ]
@@ -198,8 +208,8 @@ class OrderItem(models.Model):
     product = models.ForeignKey("vendor.product", on_delete=models.CASCADE, related_name="items")
     quantity = models.IntegerField(default=1)
     price = models.IntegerField()
-    status = models.CharField(max_length=28, choices=STATUS_CHOICES, default='ordered')
-    tracking_link = models.URLField(max_length=500, blank=True, null=True)  # ✅ added
+    status = models.CharField(max_length=28, choices=STATUS_CHOICES, default='trial')
+    tracking_link = models.URLField(max_length=500, blank=True, null=True)
 
     def total_price(self):
         return self.quantity * self.price
@@ -211,6 +221,20 @@ class OrderItem(models.Model):
 
 
 from vendor.models import product
+
+
+class Follower(models.Model):
+    """Track user follow relationships: follower follows user"""
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name='followers')
+    follower = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name='following')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'follower')
+        
+    def __str__(self):
+        return f"{self.follower.username} follows {self.user.username}"
+
 
 class Favourite(models.Model):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="favourites")

@@ -66,6 +66,7 @@ path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by
 path("stream/chatinit/", ChatInitAPIView.as_view(), name="ChatInitAPIView"),
 path("verify-trial-otp/", VerifyTrialOTPAPIView.as_view(), name="customer-verify-trial-otp"),
 path("end-trial/", EndTrialAPIView.as_view(), name="customer-end-trial"),
+path("orders/<int:order_id>/select-trial-items/", SelectTrialItemsAPIView.as_view(), name="customer-select-trial-items"),
 path("orders/<int:order_id>/cancel/", CancelOrderByCustomerAPIView.as_view(), name="customer-cancel-order"),
 path("orders/payment-summary/", OrderPaymentSummaryAPIView.as_view(), name="order-payment-summary"),
 path("orders/create-razorpay-order/", CreateRazorpayOrderAPIView.as_view(), name="create-razorpay-order"),

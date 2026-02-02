@@ -1824,6 +1824,201 @@ class EndTrialAPIView(APIView):
         )
 
 
+class SelectTrialItemsAPIView(APIView):
+    """
+    POST /customer/orders/<order_id>/select-trial-items/
+    Body: { 
+        "selected_item_ids": [1, 2, 3],
+        "cancellation_reasons": {
+            "size_doesnt_fit": true/false,
+            "color_looks_different": true/false,
+            "material_quality_not_expected": true/false,
+            "style_doesnt_suit": true/false,
+            "other": true/false
+        },
+        "other_reason": "optional text if other is true"
+    }
+    
+    After trial ends, customer selects which items they want to keep.
+    - Selected items → status becomes 'ordered'
+    - Unselected items → status becomes 'cancelled' and stock is restored
+    - Order status → 'completed'
+    
+    If NO items are selected (all cancelled), cancellation_reasons is REQUIRED.
+    
+    Order must be in 'trial_ended' status and belong to the logged-in customer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    # Valid cancellation reason keys
+    VALID_REASONS = [
+        "size_doesnt_fit",
+        "color_looks_different",
+        "material_quality_not_expected",
+        "style_doesnt_suit",
+        "other"
+    ]
+
+    def post(self, request, order_id):
+        selected_item_ids = request.data.get("selected_item_ids", [])
+        cancellation_reasons = request.data.get("cancellation_reasons", {})
+        other_reason = request.data.get("other_reason", "")
+        
+        if not isinstance(selected_item_ids, list):
+            return Response(
+                {"error": "selected_item_ids must be a list of item IDs"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            order = Order.objects.prefetch_related("items__product").get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.user_id != request.user.id:
+            return Response(
+                {"error": "You can only select items for your own order"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if order.status != "trial_ended":
+            return Response(
+                {"error": f"Can only select items when order is in 'trial_ended' status. Current status: {order.status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = list(order.items.all())
+        if not items:
+            return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Convert to set for fast lookup
+        selected_ids = set(selected_item_ids)
+        
+        # If NO items are selected, require cancellation reasons
+        if not selected_ids:
+            if not cancellation_reasons:
+                return Response(
+                    {
+                        "error": "cancellation_reasons is required when no items are selected",
+                        "required_reasons": {
+                            "size_doesnt_fit": "Size doesn't fit",
+                            "color_looks_different": "Color looks different from photo",
+                            "material_quality_not_expected": "Material quality not as expected",
+                            "style_doesnt_suit": "Style doesn't suit me",
+                            "other": "Other (provide other_reason)"
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Validate at least one reason is true
+            has_reason = any(cancellation_reasons.get(r, False) for r in self.VALID_REASONS)
+            if not has_reason:
+                return Response(
+                    {
+                        "error": "At least one cancellation reason must be true",
+                        "required_reasons": {
+                            "size_doesnt_fit": "Size doesn't fit",
+                            "color_looks_different": "Color looks different from photo",
+                            "material_quality_not_expected": "Material quality not as expected",
+                            "style_doesnt_suit": "Style doesn't suit me",
+                            "other": "Other (provide other_reason)"
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # If "other" is selected, other_reason text is required
+            if cancellation_reasons.get("other", False) and not other_reason.strip():
+                return Response(
+                    {"error": "other_reason text is required when 'other' reason is selected"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        
+        ordered_items = []
+        cancelled_items = []
+        
+        for item in items:
+            if item.id in selected_ids:
+                # Customer selected this item - mark as ordered
+                item.status = "ordered"
+                item.save(update_fields=["status"])
+                ordered_items.append(item.id)
+            else:
+                # Customer did not select - mark as cancelled and restore stock
+                item.status = "cancelled"
+                item.save(update_fields=["status"])
+                
+                # Restore stock
+                p = item.product
+                p.stock = (p.stock or 0) + item.quantity
+                p.save(update_fields=["stock"])
+                
+                cancelled_items.append(item.id)
+
+        # Mark order as completed (or cancelled if no items selected)
+        if ordered_items:
+            order.status = "completed"
+        else:
+            order.status = "cancelled"
+        
+        # Save cancellation reasons to order if any items were cancelled
+        if cancelled_items and cancellation_reasons:
+            order.cancel_size_doesnt_fit = cancellation_reasons.get("size_doesnt_fit", False)
+            order.cancel_color_looks_different = cancellation_reasons.get("color_looks_different", False)
+            order.cancel_material_quality_not_expected = cancellation_reasons.get("material_quality_not_expected", False)
+            order.cancel_style_doesnt_suit = cancellation_reasons.get("style_doesnt_suit", False)
+            order.cancel_other = cancellation_reasons.get("other", False)
+            if other_reason.strip():
+                order.cancel_other_reason = other_reason.strip()
+        
+        order.save(update_fields=[
+            "status",
+            "cancel_size_doesnt_fit",
+            "cancel_color_looks_different",
+            "cancel_material_quality_not_expected",
+            "cancel_style_doesnt_suit",
+            "cancel_other",
+            "cancel_other_reason"
+        ])
+
+        # Recalculate totals based on selected items only
+        from decimal import Decimal
+        new_item_total = Decimal("0.00")
+        for item in items:
+            if item.id in selected_ids:
+                new_item_total += Decimal(str(item.price)) * item.quantity
+        
+        new_total_amount = new_item_total + order.shipping_fee - order.coupon
+        order.item_total = new_item_total
+        order.total_amount = new_total_amount
+        order.save(update_fields=["item_total", "total_amount"])
+
+        # Build response
+        response_data = {
+            "detail": "Items selected successfully. Order completed." if ordered_items else "All items cancelled.",
+            "ordered_item_ids": ordered_items,
+            "cancelled_item_ids": cancelled_items,
+        }
+        
+        # Include cancellation reasons in response if any items were cancelled
+        if cancelled_items and cancellation_reasons:
+            response_data["cancellation_reasons"] = {
+                "size_doesnt_fit": order.cancel_size_doesnt_fit,
+                "color_looks_different": order.cancel_color_looks_different,
+                "material_quality_not_expected": order.cancel_material_quality_not_expected,
+                "style_doesnt_suit": order.cancel_style_doesnt_suit,
+                "other": order.cancel_other,
+            }
+            if order.cancel_other_reason:
+                response_data["other_reason"] = order.cancel_other_reason
+
+        from .serializers import OrderSerializer
+        response_data["order"] = OrderSerializer(order, context={"request": request}).data
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 class CancelOrderByCustomerAPIView(APIView):
     """
     Customer cancels their own order. Sets all order items to cancelled_by_customer
