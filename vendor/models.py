@@ -12,10 +12,6 @@ ist = pytz.timezone('Asia/Kolkata')
 
 
 
-from users.models import User
-
-
-
 
 class coupon(models.Model):
 
