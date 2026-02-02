@@ -77,7 +77,12 @@ class Address(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.full_name} - {self.town_city}, {self.state}"
+        parts = [self.full_name] if self.full_name else []
+        if self.city:
+            parts.append(self.city)
+        if self.state:
+            parts.append(self.state)
+        return " - ".join(str(p) for p in parts) if parts else "Address"
     
     @property
     def full_address(self):
