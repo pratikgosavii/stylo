@@ -205,6 +205,9 @@ class OrderItem(models.Model):
         ('trial', 'Trial'),
         ('ordered', 'Ordered'),
         ('cancelled', 'Cancelled'),
+        ('delivery_boy_assigned', 'Delivery Boy Assigned'),
+        ('in_transit', 'In Transit'),
+        ('delivered', 'Delivered'),
         ('returned', 'Returned'),
         ('replace', 'Replace'),
     ]

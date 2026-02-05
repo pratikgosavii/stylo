@@ -722,13 +722,10 @@ class ConfirmDeliveryByOTPAPIView(APIView):
 
     def post(self, request, order_id):
         """
-        Delivery boy confirms delivery for the entire order using OTP.
+        Delivery boy marks order as reached/delivered. No OTP required.
         Marks all items as delivered and completes the order.
+        Only the assigned delivery boy can confirm.
         """
-        otp = request.data.get("otp")
-        if not otp:
-            return Response({"error": "otp is required"}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             order = Order.objects.prefetch_related("items__product", "delivery_boy").get(id=order_id)
         except Order.DoesNotExist:
@@ -738,15 +735,12 @@ class ConfirmDeliveryByOTPAPIView(APIView):
         if not order.delivery_boy or getattr(order.delivery_boy, "account_user_id", None) != request.user.id:
             return Response({"error": "Forbidden: not assigned delivery boy"}, status=status.HTTP_403_FORBIDDEN)
 
-        if order.delivery_otp != otp:
-            return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
-
         # Mark all items delivered
         for item in order.items.all():
             item.status = "delivered"
             item.save(update_fields=["status"])
 
-        # Complete order and clear OTP
+        # Complete order
         order.status = "completed"
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])

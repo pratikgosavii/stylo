@@ -900,7 +900,11 @@ class CustomerHomeScreenAPIView(APIView):
     - Top picks (products with is_popular=True; store_name, distance_km, discount_percent)
     - Offers (app-level promotional offers; same source as banners for "Offers" section)
     - Featured products, Featured collection (with store name, distance_km, discount %)
-    Query params: latitude, longitude (optional; if omitted, uses user's default address for distance).
+
+    Query params:
+    - latitude, longitude (optional; if omitted, uses user's default address for distance)
+    - main_category_id (optional): filter stores, categories, products by main category
+    - category_id (optional): filter stores, categories, products by category
     """
     permission_classes = [IsAuthenticated]
 
@@ -908,6 +912,21 @@ class CustomerHomeScreenAPIView(APIView):
         user = request.user
         req_lat = request.query_params.get("latitude")
         req_lon = request.query_params.get("longitude")
+        main_category_id = request.query_params.get("main_category_id")
+        category_id = request.query_params.get("category_id")
+
+        # Optional category filter: by main_category and/or category
+        product_filter = product.objects.filter(is_active=True)
+        if main_category_id:
+            try:
+                product_filter = product_filter.filter(category__main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        if category_id:
+            try:
+                product_filter = product_filter.filter(category_id=int(category_id))
+            except (TypeError, ValueError):
+                pass
 
         # User location: query params or default address
         user_lat, user_lon = None, None
@@ -933,10 +952,13 @@ class CustomerHomeScreenAPIView(APIView):
         user_name = (user.first_name or user.last_name or "Customer").strip() or "Customer"
         user_greeting = {"name": user_name, "greeting": f"Hello, {user_name}"}
 
-        # Stores nearby: all active stores with lat/lon; add distance and sort
+        # Stores nearby: when category filter is applied, only stores that have products in that category
         stores_qs = vendor_store.objects.filter(is_active=True).only(
             "id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude"
         )
+        if main_category_id or category_id:
+            vendor_user_ids = product_filter.values_list("user_id", flat=True).distinct()
+            stores_qs = stores_qs.filter(user_id__in=vendor_user_ids)
         stores_list = list(stores_qs)
         stores_nearby = []
         for s in stores_list:
@@ -955,8 +977,14 @@ class CustomerHomeScreenAPIView(APIView):
         stores_nearby.sort(key=lambda x: (x["distance_km"] is None, x["distance_km"] or 999999))
         stores_nearby = stores_nearby[:20]
 
-        # Categories (product_category for horizontal row: Jackets, Tops, Dresses...)
-        categories_qs = product_category.objects.only("id", "name", "image")[:15]
+        # Categories (product_category): filter by main_category_id when provided
+        categories_qs = product_category.objects.only("id", "name", "image", "main_category_id")
+        if main_category_id:
+            try:
+                categories_qs = categories_qs.filter(main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        categories_qs = categories_qs[:15]
         categories = [
             {
                 "id": c.id,
@@ -984,11 +1012,10 @@ class CustomerHomeScreenAPIView(APIView):
             for b in banners_qs
         ]
 
-        # Featured products: active products with store + distance + discount
+        # Featured products: active products with store + distance + discount (filtered by main_category/category)
         store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
         products_featured = (
-            product.objects.filter(is_active=True)
-            .select_related("user", "category", "sub_category")
+            product_filter.select_related("user", "category", "sub_category")
             .order_by("?")[:12]
         )
         featured_products = []
@@ -1008,16 +1035,15 @@ class CustomerHomeScreenAPIView(APIView):
                 prod_data["discount_percent"] = discount_percent
             featured_products.append(prod_data)
 
-        # Featured collection: second set (e.g. is_featured or another random set)
+        # Featured collection: second set (e.g. is_featured or another random set, filtered by main_category/category)
         products_collection = (
-            product.objects.filter(is_active=True, is_featured=True)
+            product_filter.filter(is_featured=True)
             .select_related("user", "category", "sub_category")
             .order_by("?")[:12]
         )
         if not products_collection:
             products_collection = (
-                product.objects.filter(is_active=True)
-                .select_related("user", "category", "sub_category")
+                product_filter.select_related("user", "category", "sub_category")
                 .exclude(id__in=[p.get("id") for p in featured_products if isinstance(p, dict) and p.get("id")])
                 .order_by("?")[:12]
             )
@@ -1038,9 +1064,9 @@ class CustomerHomeScreenAPIView(APIView):
                 prod_data["discount_percent"] = discount_percent
             featured_collection.append(prod_data)
 
-        # Top picks: products marked is_popular (same structure as featured_products)
+        # Top picks: products marked is_popular (same structure as featured_products, filtered by main_category/category)
         products_top_picks = (
-            product.objects.filter(is_active=True, is_popular=True)
+            product_filter.filter(is_popular=True)
             .select_related("user", "category", "sub_category")
             .order_by("?")[:10]
         )

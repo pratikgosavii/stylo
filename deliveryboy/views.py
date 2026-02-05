@@ -139,5 +139,53 @@ class StartDeliveryAPIView(APIView):
             )
         order.status = "in_transit"
         order.save(update_fields=["status"])
+        # Optionally set order items to in_transit
+        for item in order.items.all():
+            if item.status != "delivered":
+                item.status = "in_transit"
+                item.save(update_fields=["status"])
+        serializer = OrderSerializer(order, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ConfirmDeliveryAPIView(APIView):
+    """
+    POST /deliveryboy/orders/<order_id>/confirm-delivery/
+    Mark order as reached/delivered. No OTP required.
+    Marks all order items as delivered and order as completed.
+    Only the assigned delivery boy can call this.
+    Auth: delivery boy JWT.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        if not getattr(request.user, "is_deliveryboy", False):
+            return Response(
+                {"error": "Not a delivery boy account"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        delivery_boy = DeliveryBoy.objects.filter(account_user=request.user).first()
+        if not delivery_boy:
+            return Response(
+                {"error": "Delivery boy profile not found"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            order = Order.objects.prefetch_related("items__product", "delivery_boy").get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not order.delivery_boy or order.delivery_boy.id != delivery_boy.id:
+            return Response(
+                {"error": "Forbidden: order is not assigned to you"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Mark all items delivered
+        for item in order.items.all():
+            item.status = "delivered"
+            item.save(update_fields=["status"])
+        # Complete order
+        order.status = "completed"
+        order.delivery_otp = None
+        order.save(update_fields=["status", "delivery_otp"])
         serializer = OrderSerializer(order, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
