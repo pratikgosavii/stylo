@@ -34,6 +34,8 @@ urlpatterns = [
     
     path("vendor-stores/", VendorStoreAPIView.as_view(), name="vendor-store-list"),
     path("orders/<int:order_id>/assign-delivery-boy/", AssignDeliveryBoyAPIView.as_view(), name="assign-delivery-boy"),
+    path("orders/<int:order_id>/accept/", AcceptOrderAPIView.as_view(), name="vendor-accept-order"),
+    path("orders/<int:order_id>/reject/", RejectOrderAPIView.as_view(), name="vendor-reject-order"),
     path("orders/<int:order_id>/set-status/", CommonOrderStatusUpdateAPIView.as_view(), name="common-order-status-update"),
     path("orders/<int:order_id>/confirm-delivery/", ConfirmDeliveryByOTPAPIView.as_view(), name="confirm-delivery-by-otp"),
 

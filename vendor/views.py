@@ -336,12 +336,6 @@ class AssignDeliveryBoyAPIView(APIView):
         order.delivery_otp_generated_at = timezone.now()
         order.save(update_fields=["delivery_boy", "delivery_otp", "delivery_otp_generated_at"])
 
-        # Update each order item status to 'delivery_boy_assigned' if not delivered
-        for item in order.items.all():
-            if item.status != "delivered":
-                item.status = "delivery_boy_assigned"
-                item.save(update_fields=["status"])
-
         return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
@@ -632,18 +626,68 @@ class DeliveryBoyLogoutAPIView(APIView):
                 pass
         return Response({"message": "Logged out"}, status=status.HTTP_200_OK)
 
+class AcceptOrderAPIView(APIView):
+    """
+    POST /vendor/orders/<order_id>/accept/
+    Vendor accepts the order. Only order status set to 'accepted'; OrderItem statuses unchanged.
+    Auth: vendor JWT. Order must contain only this vendor's products.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        items = list(order.items.all())
+        if not items:
+            return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all(getattr(i.product, "user_id", None) == request.user.id for i in items):
+            return Response({"error": "Forbidden: order contains items from other vendors"}, status=status.HTTP_403_FORBIDDEN)
+        order.status = "accepted"
+        order.save(update_fields=["status"])
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
+class RejectOrderAPIView(APIView):
+    """
+    POST /vendor/orders/<order_id>/reject/
+    Vendor rejects the order. Order items set to 'cancelled', order status to 'cancelled', product stock restored.
+    Cannot reject if order is already completed. Auth: vendor JWT.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        items = list(order.items.all())
+        if not items:
+            return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all(getattr(i.product, "user_id", None) == request.user.id for i in items):
+            return Response({"error": "Forbidden: order contains items from other vendors"}, status=status.HTTP_403_FORBIDDEN)
+        if order.status == "completed":
+            return Response({"error": "Cannot reject after order is completed"}, status=status.HTTP_400_BAD_REQUEST)
+        for i in items:
+            i.status = "cancelled"
+            i.save(update_fields=["status"])
+            p = i.product
+            p.stock = (p.stock or 0) + i.quantity
+            p.save(update_fields=["stock"])
+        order.status = "cancelled"
+        order.save(update_fields=["status"])
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
 class CommonOrderStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id):
         """
-        Update ALL order items for an order to one of:
-        accepted | rejected | delivered | cancelled_by_customer | cancelled_by_vendor | approved_by_customer
-
-        Rules:
-        - Cannot set to approved_by_customer unless ALL items are already delivered
-        - Cannot set to any cancelled_* if ANY item is already delivered
-        - Vendor ownership check: all items in the order must belong to the requesting vendor
+        Update order status to: accepted | rejected | cancelled_by_vendor.
+        OrderItem statuses only set to 'cancelled' when rejecting/cancelling; accepted is order-level only.
+        Cannot cancel if order is already completed. Vendor ownership required.
         """
         new_status = (request.data.get("status") or "").strip()
         allowed_statuses = {
@@ -663,55 +707,23 @@ class CommonOrderStatusUpdateAPIView(APIView):
         if not items:
             return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ownership: all items products must belong to this vendor
         if not all(getattr(i.product, "user_id", None) == request.user.id for i in items):
             return Response({"error": "Forbidden: order contains items from other vendors"}, status=status.HTTP_403_FORBIDDEN)
 
-        # Business rules
-        if new_status.startswith("cancelled_"):
-            if any(i.status == "delivered" for i in items):
-                return Response({"error": "Cannot cancel after any item is delivered"}, status=status.HTTP_400_BAD_REQUEST)
+        if new_status in ("rejected", "cancelled_by_vendor") and order.status == "completed":
+            return Response({"error": "Cannot cancel after order is completed"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Statuses that mean order item is reversed → restore product stock
-        REVERSE_STATUSES = {
-            "rejected",
-            "cancelled_by_vendor",
-            "cancelled_by_customer",
-            "returned_by_customer",
-            "returned_by_vendor",
-        }
-
-        # Apply status to all items and restore stock when transitioning to a reverse status
-        for i in items:
-            old_status = i.status
-            i.status = new_status if new_status in {"accepted", "rejected"} else (
-                new_status if new_status.startswith("cancelled_") else "delivered"
-            )
-            i.save(update_fields=["status"])
-            # Restore stock only when first transitioning to a reverse status (avoid double restore)
-            if old_status not in REVERSE_STATUSES and i.status in REVERSE_STATUSES:
+        if new_status == "accepted":
+            order.status = "accepted"
+            order.save(update_fields=["status"])
+        else:
+            for i in items:
+                i.status = "cancelled"
+                i.save(update_fields=["status"])
                 p = i.product
                 p.stock = (p.stock or 0) + i.quantity
                 p.save(update_fields=["stock"])
-
-        # Reflect on order.status
-        if new_status == "accepted":
-            order.status = "accepted"
-        elif new_status == "rejected":
             order.status = "cancelled"
-        elif new_status.startswith("cancelled_"):
-            order.status = "cancelled"
-        elif new_status == "delivered":
-            order.status = "completed"
-            # Clear OTP if present
-            if hasattr(order, "delivery_otp"):
-                order.delivery_otp = None
-
-
-        # Save order fields accordingly
-        if hasattr(order, "delivery_otp"):
-            order.save(update_fields=["status", "delivery_otp"])
-        else:
             order.save(update_fields=["status"])
 
         return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
@@ -735,12 +747,7 @@ class ConfirmDeliveryByOTPAPIView(APIView):
         if not order.delivery_boy or getattr(order.delivery_boy, "account_user_id", None) != request.user.id:
             return Response({"error": "Forbidden: not assigned delivery boy"}, status=status.HTTP_403_FORBIDDEN)
 
-        # Mark all items delivered
-        for item in order.items.all():
-            item.status = "delivered"
-            item.save(update_fields=["status"])
-
-        # Complete order
+        # Complete order (delivery status lives on Order only; OrderItem statuses unchanged)
         order.status = "completed"
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])

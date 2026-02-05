@@ -201,13 +201,11 @@ class Order(models.Model):
     
 
 class OrderItem(models.Model):
+    """Item-level statuses only: trial, ordered, cancelled, returned, replace. Accepted/rejected/in_transit/delivered live on Order only."""
     STATUS_CHOICES = [
         ('trial', 'Trial'),
         ('ordered', 'Ordered'),
         ('cancelled', 'Cancelled'),
-        ('delivery_boy_assigned', 'Delivery Boy Assigned'),
-        ('in_transit', 'In Transit'),
-        ('delivered', 'Delivered'),
         ('returned', 'Returned'),
         ('replace', 'Replace'),
     ]

@@ -129,7 +129,7 @@ class StartDeliveryAPIView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
-            order = Order.objects.prefetch_related("items__product").get(id=order_id)
+            order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
         if not order.delivery_boy or order.delivery_boy.id != delivery_boy.id:
@@ -139,11 +139,6 @@ class StartDeliveryAPIView(APIView):
             )
         order.status = "in_transit"
         order.save(update_fields=["status"])
-        # Optionally set order items to in_transit
-        for item in order.items.all():
-            if item.status != "delivered":
-                item.status = "in_transit"
-                item.save(update_fields=["status"])
         serializer = OrderSerializer(order, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -179,11 +174,7 @@ class ConfirmDeliveryAPIView(APIView):
                 {"error": "Forbidden: order is not assigned to you"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        # Mark all items delivered
-        for item in order.items.all():
-            item.status = "delivered"
-            item.save(update_fields=["status"])
-        # Complete order
+        # Complete order (delivery status on Order only; OrderItem statuses unchanged)
         order.status = "completed"
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])

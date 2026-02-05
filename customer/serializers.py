@@ -34,12 +34,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
     def _is_allowed_check(self, obj, return_type):
         """
         Common check:
-        - Delivered
+        - Order completed (delivery lives on Order, not OrderItem)
         - Product allows return/replacement
         - Within 7 days
-        - No pending/approved ReturnExchange already exists
+        - Item not already returned/replaced/cancelled
         """
-        if obj.status != 'delivered':
+        if getattr(obj.order, 'status', None) != 'completed':
             return False
 
         product = obj.product
@@ -56,15 +56,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
         if return_type == 'exchange' and not getattr(product, 'replacement', False):
             return False
 
-        # Check if a pending/approved ReturnExchange exists
-        blocked_status = [
-            'returned/replaced_rejected', 
-            'returned/replaced_completed', 
-            'cancelled'
-        ]
-        
-        if obj.status not in blocked_status:
-            return True  # eligible
+        # Item must not already be returned, replaced, or cancelled
+        blocked_status = ['returned', 'replace', 'cancelled']
+        if obj.status in blocked_status:
+            return False
 
         return True
 

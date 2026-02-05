@@ -1540,8 +1540,8 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
         if order_item.order.user != user:
             raise ValidationError("You can only review products you have purchased.")
 
-        # ✅ Ensure order was delivered before review
-        if order_item.status != "delivered":
+        # ✅ Ensure order was completed (delivery lives on Order) before review
+        if getattr(order_item.order, "status", None) != "completed":
             raise ValidationError("You can only review after delivery.")
 
         # ✅ Save safely
@@ -2047,8 +2047,8 @@ class SelectTrialItemsAPIView(APIView):
 
 class CancelOrderByCustomerAPIView(APIView):
     """
-    Customer cancels their own order. Sets all order items to cancelled_by_customer
-    and restores product stock. Cannot cancel if any item is already delivered.
+    Customer cancels their own order. Sets all order items to cancelled
+    and restores product stock. Cannot cancel after order is completed.
     """
     permission_classes = [IsAuthenticated]
 
@@ -2065,24 +2065,18 @@ class CancelOrderByCustomerAPIView(APIView):
         if not items:
             return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if any(i.status == "delivered" for i in items):
+        if order.status == "completed":
             return Response(
-                {"error": "Cannot cancel after any item is delivered"},
+                {"error": "Cannot cancel after order is completed"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        REVERSE_STATUSES = {
-            "rejected",
-            "cancelled_by_vendor",
-            "cancelled_by_customer",
-            "returned_by_customer",
-            "returned_by_vendor",
-        }
-        new_status = "cancelled_by_customer"
+        # Item statuses that already mean no stock (do not double-restore)
+        REVERSE_STATUSES = {"cancelled", "returned", "replace"}
 
         for i in items:
             old_status = i.status
-            i.status = new_status
+            i.status = "cancelled"
             i.save(update_fields=["status"])
             if old_status not in REVERSE_STATUSES:
                 p = i.product
@@ -2314,13 +2308,7 @@ class RazorpayWebhookAPIView(APIView):
         except Exception:
             return Response({"detail": "Ignored: app order not found"}, status=200)
 
-        # Mark all items as approved_by_customer upon capture
-        for it in order.items.all():
-            if it.status != "approved_by_customer":
-                it.status = "approved_by_customer"
-                it.save(update_fields=["status"])
-
-        # Reflect order state
+        # Reflect order state (accepted/in_transit/delivered live on Order only; OrderItem unchanged)
         order.status = "accepted"
         order.save(update_fields=["status"])
 
