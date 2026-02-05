@@ -142,6 +142,7 @@ class Order(models.Model):
         ('in_transit', 'In Transit'),
         ('trial_begin', 'Trial Begin'),
         ('trial_ended', 'Trial Ended'),
+        ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
         ('completed', 'Completed'),
     ]

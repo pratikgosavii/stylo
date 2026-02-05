@@ -748,7 +748,7 @@ class ConfirmDeliveryByOTPAPIView(APIView):
             return Response({"error": "Forbidden: not assigned delivery boy"}, status=status.HTTP_403_FORBIDDEN)
 
         # Complete order (delivery status lives on Order only; OrderItem statuses unchanged)
-        order.status = "completed"
+        order.status = "delivered"
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])
 
