@@ -680,6 +680,29 @@ class RejectOrderAPIView(APIView):
         return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
+class ReadyToDispatchOrderAPIView(APIView):
+    """
+    POST /vendor/orders/<order_id>/ready-to-dispatch/
+    Vendor marks the order as ready to dispatch. Sets order status to 'ready_to_dispatch'.
+    Auth: vendor JWT. Order must contain only this vendor's products.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        items = list(order.items.all())
+        if not items:
+            return Response({"error": "No items in order"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all(getattr(i.product, "user_id", None) == request.user.id for i in items):
+            return Response({"error": "Forbidden: order contains items from other vendors"}, status=status.HTTP_403_FORBIDDEN)
+        order.status = "ready_to_dispatch"
+        order.save(update_fields=["status"])
+        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
+
+
 class CommonOrderStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
