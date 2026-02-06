@@ -156,6 +156,23 @@ class product(models.Model):
         ('2XL', '2XL'),
     )
 
+    FABRIC_TYPE_CHOICES = [
+        ('cotton', 'Cotton'),
+        ('polyester', 'Polyester'),
+        ('silk', 'Silk'),
+        ('wool', 'Wool'),
+        ('linen', 'Linen'),
+        ('rayon', 'Rayon'),
+        ('nylon', 'Nylon'),
+        ('denim', 'Denim'),
+        ('velvet', 'Velvet'),
+        ('chiffon', 'Chiffon'),
+        ('georgette', 'Georgette'),
+        ('satin', 'Satin'),
+        ('leather', 'Leather'),
+        ('blend', 'Blend'),
+        ('other', 'Other'),
+    ]
 
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name='productssdsdsd', null=True, blank=True)
 
@@ -184,6 +201,7 @@ class product(models.Model):
     # Optional
     brand_name = models.CharField(max_length=255, null=True, blank=True)
     color = models.CharField(max_length=50, null=True, blank=True)
+    fabric_type = models.CharField(max_length=20, choices=FABRIC_TYPE_CHOICES, null=True, blank=True)
     size = models.ForeignKey("masters.size", on_delete=models.CASCADE, null=True, blank=True)
     batch_number = models.CharField(max_length=100, null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)

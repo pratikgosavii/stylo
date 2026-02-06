@@ -121,22 +121,39 @@ from vendor.models import product
 from vendor.serializers import product_serializer
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from vendor.filters import ProductFilter
 
 
-from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, IntegerField
+from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, IntegerField, Avg
+from django.db.models.functions import Coalesce
 
 
 class ListProducts(ListAPIView):
+    """
+    GET /customer/list-products/
+    Filter params: search, name, brand_name, color, description, batch_number, hsn,
+    min_price, max_price, min_mrp, max_mrp, min_stock, max_stock, in_stock,
+    main_category_id, category_id, sub_category_id, store_id, user_id,
+    replacement, shop_exchange, shop_warranty, brand_warranty,
+    is_popular, is_featured, is_active,
+    ordering: -sales_price (price high to low), sales_price (price low to high),
+    -avg_rating (rating high to low), avg_rating (rating low to high),
+    name, -created_at, stock, mrp, etc.
+    """
     serializer_class = product_serializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = ProductFilter
+    ordering_fields = ["name", "sales_price", "mrp", "stock", "created_at", "is_popular", "is_featured", "avg_rating"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         user = self.request.user
-        qs = product.objects.filter(is_active=True)
+        qs = product.objects.filter(is_active=True).annotate(
+            avg_rating=Coalesce(Avg("items__product_reviews__rating"), 0)
+        )
 
         # Order by nearby: use request.user's location (default address or ?latitude=&longitude=)
         user_lat, user_lon = None, None
@@ -537,6 +554,24 @@ class ReelCommentListCreateAPIView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+class ReelCommentDeleteAPIView(APIView):
+    """
+    DELETE /customer/reels/<reel_id>/comments/<comment_id>/
+    Delete a comment. Only the comment author can delete.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, reel_id, comment_id):
+        try:
+            comment = ReelComment.objects.get(id=comment_id, reel_id=reel_id)
+        except ReelComment.DoesNotExist:
+            return Response({"detail": "Comment not found."}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user_id != request.user.id:
+            return Response({"detail": "You can only delete your own comment."}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -595,8 +630,33 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
     def my_favourites(self, request):
         favourites = FavouriteStore.objects.filter(user=request.user).select_related('store')
         stores = [fav.store for fav in favourites]
-        serializer = VendorStoreSerializer(stores, many=True)
+        serializer = VendorStoreSerializer(stores, many=True, context={"request": request})
         return Response(serializer.data)
+
+
+class LikedProductsAndStoresAPIView(APIView):
+    """
+    GET /customer/liked-products-and-stores/
+    Returns both liked products and liked stores in one response.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        # Liked products
+        product_favs = Favourite.objects.filter(user=user, product__is_active=True).select_related("product")
+        products = [fav.product for fav in product_favs]
+        liked_products = product_serializer(products, many=True, context={"request": request}).data
+
+        # Liked stores
+        store_favs = FavouriteStore.objects.filter(user=user).select_related("store")
+        stores = [fav.store for fav in store_favs]
+        liked_stores = VendorStoreSerializer(stores, many=True, context={"request": request}).data
+
+        return Response({
+            "liked_products": liked_products,
+            "liked_stores": liked_stores,
+        }, status=status.HTTP_200_OK)
 
 
 class offersView(APIView):
@@ -865,7 +925,74 @@ class StoreByCategoryView(APIView):
 
         serializer = VendorStoreSerializer(stores, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
+
+class SellersNearYouAPIView(APIView):
+    """
+    GET /customer/sellers-near-you/
+    Returns stores (sellers) within 10km of user, filtered by main_category_id and/or category_id.
+    Query params: latitude, longitude (optional; else uses default address), main_category_id, category_id
+    """
+    permission_classes = [IsAuthenticated]
+    NEARBY_KM = 10
+
+    def get(self, request):
+        main_category_id = request.query_params.get("main_category_id")
+        category_id = request.query_params.get("category_id")
+        req_lat = request.query_params.get("latitude")
+        req_lon = request.query_params.get("longitude")
+
+        # User location: query params or default address
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=request.user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+
+        # Filter stores by category: only stores that have products in main_category and/or category
+        product_qs = product.objects.filter(is_active=True)
+        if main_category_id:
+            try:
+                product_qs = product_qs.filter(category__main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        if category_id:
+            try:
+                product_qs = product_qs.filter(category_id=int(category_id))
+            except (TypeError, ValueError):
+                pass
+        vendor_user_ids = list(product_qs.values_list("user_id", flat=True).distinct())
+
+        # Stores that have products in the filtered category
+        stores_qs = vendor_store.objects.filter(
+            is_active=True,
+            user_id__in=vendor_user_ids,
+            latitude__isnull=False,
+            longitude__isnull=False,
+        ).only("id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude")
+        stores_list = list(stores_qs)
+
+        # Filter to within 10km and add distance
+        results = []
+        for s in stores_list:
+            dist = _haversine_km(user_lat or 0, user_lon or 0, float(s.latitude), float(s.longitude))
+            if user_lat is not None and user_lon is not None and dist <= self.NEARBY_KM:
+                store_data = VendorStoreSerializer(s, context={"request": request}).data
+                if isinstance(store_data, dict):
+                    store_data["distance_km"] = dist
+                results.append(store_data)
+        results.sort(key=lambda x: x.get("distance_km", 999999))
+
+        return Response({"stores": results}, status=status.HTTP_200_OK)
 
 
 from django.db.models import Prefetch

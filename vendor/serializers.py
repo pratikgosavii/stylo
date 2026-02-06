@@ -225,6 +225,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
     reviews = serializers.SerializerMethodField()
     vendor_name = serializers.SerializerMethodField(read_only=True)
     spotlight_products = serializers.SerializerMethodField(read_only=True)
+    is_favourite = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = vendor_store
@@ -262,7 +263,16 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'is_online',
             'store_rating',
             'reviews',
+            'is_favourite',
         ]
+
+    def get_is_favourite(self, obj):
+        """Whether the request user has favourited this store."""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        from customer.models import FavouriteStore
+        return FavouriteStore.objects.filter(user=request.user, store=obj).exists()
 
     def get_vendor_name(self, obj):
         """Vendor/owner name from linked User (first_name + last_name)."""
