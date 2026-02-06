@@ -995,12 +995,14 @@ class CustomerHomeScreenAPIView(APIView):
         # Main categories
         main_categories = [{"id": mc.id, "name": mc.name} for mc in MainCategory.objects.only("id", "name")]
 
-        # Banners: approved BannerCampaign from stores within 10km (limit 10)
-        banners_qs = (
-            BannerCampaign.objects.filter(is_approved=True, user_id__in=vendor_user_ids)
-            .select_related("user")
-            .order_by("-created_at")[:self.SECTION_LIMIT]
-        )
+        # Banners: approved BannerCampaign from stores within 10km (limit 10); filter by main_category_id when provided
+        banners_qs = BannerCampaign.objects.filter(is_approved=True, user_id__in=vendor_user_ids)
+        if main_category_id:
+            try:
+                banners_qs = banners_qs.filter(main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        banners_qs = banners_qs.select_related("user").order_by("-created_at")[:self.SECTION_LIMIT]
         banners = []
         for b in banners_qs:
             store = getattr(b.user, "vendor_store", None)
@@ -1012,6 +1014,7 @@ class CustomerHomeScreenAPIView(APIView):
                 "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
                 "store_id": store_obj.id if store_obj else None,
                 "store_name": store_obj.name if store_obj else None,
+                "main_category_id": b.main_category_id,
             })
 
         def _enrich_product(prod, store):
@@ -1067,7 +1070,7 @@ class CustomerHomeScreenAPIView(APIView):
             )
         featured_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_featured]
 
-        # Offers: store banners (same source as banners for "Offers" section on home)
+        # Offers: store banners (same source as banners; filtered by main_category_id when provided)
         offers = []
         for b in banners_qs:
             store_rel = getattr(b.user, "vendor_store", None)
@@ -1079,6 +1082,7 @@ class CustomerHomeScreenAPIView(APIView):
                 "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
                 "store_id": store_obj.id if store_obj else None,
                 "store_name": store_obj.name if store_obj else None,
+                "main_category_id": b.main_category_id,
             })
 
         payload = {
