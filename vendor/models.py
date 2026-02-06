@@ -131,6 +131,8 @@ class Reel(models.Model):
 class BannerCampaign(models.Model):
   
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name='banners')
+    store = models.ForeignKey(vendor_store, on_delete=models.CASCADE, null=True, blank=True, related_name='banners')
+    product = models.ForeignKey("product", on_delete=models.SET_NULL, null=True, blank=True, related_name='banner_campaigns')
     banner_image = models.ImageField(upload_to='campaign_banners/', help_text="Max 1MB, Ratio 1:3")
     campaign_name = models.CharField(max_length=255)
     is_approved = models.BooleanField(default=False)

@@ -4,7 +4,7 @@ from django.shortcuts import render
 # Create your views here.
 
 
-from masters.models import MainCategory, product_category, product_subcategory, home_banner
+from masters.models import MainCategory, product_category, product_subcategory
 from users.models import *
 
 from rest_framework import viewsets, permissions
@@ -893,42 +893,30 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 class CustomerHomeScreenAPIView(APIView):
     """
     Single API for customer home screen UI:
-    - User greeting + default delivery address (with optional distance)
-    - Stores nearby (with distance_km, sorted by distance)
-    - Categories (for horizontal icons), Main categories (for buttons)
-    - Banners (app-level promotional)
-    - Top picks (products with is_popular=True; store_name, distance_km, discount_percent)
-    - Offers (app-level promotional offers; same source as banners for "Offers" section)
-    - Featured products, Featured collection (with store name, distance_km, discount %)
+    - Stores nearby: only within 10km of user location
+    - All product/banner/offer data from stores within 10km
+    - Sections (10 each): banners, random_products, favourite_products, top_picks, offers, featured_products
 
     Query params:
     - latitude, longitude (optional; if omitted, uses user's default address for distance)
-    - main_category_id (optional): filter stores, categories, products by main category
-    - category_id (optional): filter stores, categories, products by category
+    - main_category_id (optional): filter products/categories by main category
+
+    Logic:
+    - Stores: only within 10km of user location
+    - All product/banner/offer data filtered by stores within 10km
+    - Each section limited to 10 items
     """
     permission_classes = [IsAuthenticated]
+    NEARBY_KM = 10
+    SECTION_LIMIT = 10
 
     def get(self, request, *args, **kwargs):
         user = request.user
         req_lat = request.query_params.get("latitude")
         req_lon = request.query_params.get("longitude")
         main_category_id = request.query_params.get("main_category_id")
-        category_id = request.query_params.get("category_id")
 
-        # Optional category filter: by main_category and/or category
-        product_filter = product.objects.filter(is_active=True)
-        if main_category_id:
-            try:
-                product_filter = product_filter.filter(category__main_category_id=int(main_category_id))
-            except (TypeError, ValueError):
-                pass
-        if category_id:
-            try:
-                product_filter = product_filter.filter(category_id=int(category_id))
-            except (TypeError, ValueError):
-                pass
-
-        # User location: query params or default address
+        # User location: query params or default address (required for 10km filter)
         user_lat, user_lon = None, None
         default_address = None
         default_address_obj = Address.objects.filter(user=user, is_default=True).first()
@@ -948,36 +936,50 @@ class CustomerHomeScreenAPIView(APIView):
             except (TypeError, ValueError):
                 pass
 
+        # Stores nearby: only within 10km
+        stores_qs = vendor_store.objects.filter(
+            is_active=True, latitude__isnull=False, longitude__isnull=False
+        ).only("id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude")
+        stores_list = list(stores_qs)
+        stores_nearby = []
+        vendor_user_ids = []
+        for s in stores_list:
+            dist = _haversine_km(user_lat or 0, user_lon or 0, float(s.latitude), float(s.longitude))
+            if user_lat is not None and user_lon is not None and dist <= self.NEARBY_KM:
+                vendor_user_ids.append(getattr(s, "user_id", None))
+                item = {
+                    "id": s.id,
+                    "user_id": getattr(s, "user_id", None),
+                    "name": s.name,
+                    "profile_image": request.build_absolute_uri(s.profile_image.url) if s.profile_image else None,
+                    "banner_image": request.build_absolute_uri(s.banner_image.url) if s.banner_image else None,
+                    "latitude": str(s.latitude),
+                    "longitude": str(s.longitude),
+                    "distance_km": dist,
+                }
+                stores_nearby.append(item)
+        stores_nearby.sort(key=lambda x: x["distance_km"])
+        stores_nearby = stores_nearby[:self.SECTION_LIMIT]
+        vendor_user_ids = list({uid for uid in vendor_user_ids if uid is not None})
+        if not vendor_user_ids and stores_list:
+            store_user_ids = {getattr(s, "user_id", None) for s in stores_list}
+            vendor_user_ids = [uid for uid in store_user_ids if uid is not None]
+
+        # Product filter: active products from stores within 10km
+        product_filter = product.objects.filter(is_active=True, user_id__in=vendor_user_ids)
+        if main_category_id:
+            try:
+                product_filter = product_filter.filter(category__main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+
         # User greeting
         user_name = (user.first_name or user.last_name or "Customer").strip() or "Customer"
         user_greeting = {"name": user_name, "greeting": f"Hello, {user_name}"}
 
-        # Stores nearby: when category filter is applied, only stores that have products in that category
-        stores_qs = vendor_store.objects.filter(is_active=True).only(
-            "id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude"
-        )
-        if main_category_id or category_id:
-            vendor_user_ids = product_filter.values_list("user_id", flat=True).distinct()
-            stores_qs = stores_qs.filter(user_id__in=vendor_user_ids)
-        stores_list = list(stores_qs)
-        stores_nearby = []
-        for s in stores_list:
-            item = {
-                "id": s.id,
-                "name": s.name,
-                "profile_image": request.build_absolute_uri(s.profile_image.url) if s.profile_image else None,
-                "banner_image": request.build_absolute_uri(s.banner_image.url) if s.banner_image else None,
-                "latitude": str(s.latitude) if s.latitude else None,
-                "longitude": str(s.longitude) if s.longitude else None,
-                "distance_km": None,
-            }
-            if user_lat is not None and user_lon is not None and s.latitude is not None and s.longitude is not None:
-                item["distance_km"] = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
-            stores_nearby.append(item)
-        stores_nearby.sort(key=lambda x: (x["distance_km"] is None, x["distance_km"] or 999999))
-        stores_nearby = stores_nearby[:20]
+        store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
 
-        # Categories (product_category): filter by main_category_id when provided
+        # Categories (filter by main_category_id when provided)
         categories_qs = product_category.objects.only("id", "name", "image", "main_category_id")
         if main_category_id:
             try:
@@ -986,117 +988,98 @@ class CustomerHomeScreenAPIView(APIView):
                 pass
         categories_qs = categories_qs[:15]
         categories = [
-            {
-                "id": c.id,
-                "name": c.name,
-                "image": request.build_absolute_uri(c.image.url) if c.image else None,
-            }
+            {"id": c.id, "name": c.name, "image": request.build_absolute_uri(c.image.url) if c.image else None}
             for c in categories_qs
         ]
 
-        # Main categories (for Women's Fashion, Men's Fashion buttons)
-        main_categories = [
-            {"id": mc.id, "name": mc.name}
-            for mc in MainCategory.objects.only("id", "name")
-        ]
+        # Main categories
+        main_categories = [{"id": mc.id, "name": mc.name} for mc in MainCategory.objects.only("id", "name")]
 
-        # Banners (app-level: home_banner from masters)
-        banners_qs = home_banner.objects.filter(is_active=True).order_by("-created_at")[:5]
-        banners = [
-            {
+        # Banners: approved BannerCampaign from stores within 10km (limit 10)
+        banners_qs = (
+            BannerCampaign.objects.filter(is_approved=True, user_id__in=vendor_user_ids)
+            .select_related("user")
+            .order_by("-created_at")[:self.SECTION_LIMIT]
+        )
+        banners = []
+        for b in banners_qs:
+            store = getattr(b.user, "vendor_store", None)
+            store_obj = store.first() if store else None
+            banners.append({
                 "id": b.id,
-                "title": b.title or "",
-                "description": b.description or "",
-                "image": request.build_absolute_uri(b.image.url) if b.image else None,
-            }
-            for b in banners_qs
-        ]
+                "title": b.campaign_name or "",
+                "description": "",
+                "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
+                "store_id": store_obj.id if store_obj else None,
+                "store_name": store_obj.name if store_obj else None,
+            })
 
-        # Featured products: active products with store + distance + discount (filtered by main_category/category)
-        store_by_user_id = {s.user_id: s for s in stores_list if getattr(s, "user_id", None)}
-        products_featured = (
-            product_filter.select_related("user", "category", "sub_category")
-            .order_by("?")[:12]
-        )
-        featured_products = []
-        for p in products_featured:
-            store = store_by_user_id.get(p.user_id) if p.user_id else None
+        def _enrich_product(prod, store):
             distance_km = None
             if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
                 distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
             discount_percent = None
-            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
-                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
-            prod_data = product_serializer(p, context={"request": request}).data
+            if prod.mrp and prod.mrp > 0 and prod.sales_price is not None and prod.sales_price < prod.mrp:
+                discount_percent = round((float(prod.mrp) - float(prod.sales_price)) / float(prod.mrp) * 100)
+            prod_data = product_serializer(prod, context={"request": request}).data
             if isinstance(prod_data, dict):
                 prod_data["store_name"] = store.name if store else None
                 prod_data["store_id"] = store.id if store else None
                 prod_data["distance_km"] = distance_km
                 prod_data["discount_percent"] = discount_percent
-            featured_products.append(prod_data)
+            return prod_data
 
-        # Featured collection: second set (e.g. is_featured or another random set, filtered by main_category/category)
-        products_collection = (
-            product_filter.filter(is_featured=True)
-            .select_related("user", "category", "sub_category")
-            .order_by("?")[:12]
+        # Random products: 10 random from stores within 10km
+        products_random = product_filter.select_related("user", "category", "sub_category").order_by("?")[:self.SECTION_LIMIT]
+        random_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_random]
+
+        # Favourites: 10 user favourites from stores within 10km
+        favourites_qs = (
+            Favourite.objects.filter(user=user, product__user_id__in=vendor_user_ids, product__is_active=True)
+            .select_related("product", "product__user")
+            .order_by("?")[:self.SECTION_LIMIT]
         )
-        if not products_collection:
-            products_collection = (
-                product_filter.select_related("user", "category", "sub_category")
-                .exclude(id__in=[p.get("id") for p in featured_products if isinstance(p, dict) and p.get("id")])
-                .order_by("?")[:12]
-            )
-        featured_collection = []
-        for p in products_collection:
+        favourite_products = []
+        for fav in favourites_qs:
+            p = fav.product
             store = store_by_user_id.get(p.user_id) if p.user_id else None
-            distance_km = None
-            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
-                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
-            discount_percent = None
-            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
-                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
-            prod_data = product_serializer(p, context={"request": request}).data
-            if isinstance(prod_data, dict):
-                prod_data["store_name"] = store.name if store else None
-                prod_data["store_id"] = store.id if store else None
-                prod_data["distance_km"] = distance_km
-                prod_data["discount_percent"] = discount_percent
-            featured_collection.append(prod_data)
+            favourite_products.append(_enrich_product(p, store))
 
-        # Top picks: products marked is_popular (same structure as featured_products, filtered by main_category/category)
+        # Top picks: 10 products with is_popular from stores within 10km
         products_top_picks = (
             product_filter.filter(is_popular=True)
             .select_related("user", "category", "sub_category")
-            .order_by("?")[:10]
+            .order_by("?")[:self.SECTION_LIMIT]
         )
-        top_picks = []
-        for p in products_top_picks:
-            store = store_by_user_id.get(p.user_id) if p.user_id else None
-            distance_km = None
-            if user_lat is not None and user_lon is not None and store and store.latitude is not None and store.longitude is not None:
-                distance_km = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
-            discount_percent = None
-            if p.mrp and p.mrp > 0 and p.sales_price is not None and p.sales_price < p.mrp:
-                discount_percent = round((float(p.mrp) - float(p.sales_price)) / float(p.mrp) * 100)
-            prod_data = product_serializer(p, context={"request": request}).data
-            if isinstance(prod_data, dict):
-                prod_data["store_name"] = store.name if store else None
-                prod_data["store_id"] = store.id if store else None
-                prod_data["distance_km"] = distance_km
-                prod_data["discount_percent"] = discount_percent
-            top_picks.append(prod_data)
+        top_picks = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_top_picks]
 
-        # Offers: app-level promotional offers (same as banners for "Offers" section on home)
-        offers = [
-            {
+        # Featured products: 10 from stores within 10km
+        products_featured = (
+            product_filter.filter(is_featured=True)
+            .select_related("user", "category", "sub_category")
+            .order_by("?")[:self.SECTION_LIMIT]
+        )
+        if not products_featured.exists():
+            products_featured = (
+                product_filter.select_related("user", "category", "sub_category")
+                .exclude(id__in=[p.get("id") for p in random_products if isinstance(p, dict) and p.get("id")])
+                .order_by("?")[:self.SECTION_LIMIT]
+            )
+        featured_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_featured]
+
+        # Offers: store banners (same source as banners for "Offers" section on home)
+        offers = []
+        for b in banners_qs:
+            store_rel = getattr(b.user, "vendor_store", None)
+            store_obj = store_rel.first() if store_rel else None
+            offers.append({
                 "id": b.id,
-                "title": b.title or "",
-                "description": b.description or "",
-                "image": request.build_absolute_uri(b.image.url) if b.image else None,
-            }
-            for b in banners_qs
-        ]
+                "title": b.campaign_name or "",
+                "description": "",
+                "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
+                "store_id": store_obj.id if store_obj else None,
+                "store_name": store_obj.name if store_obj else None,
+            })
 
         payload = {
             "user_greeting": user_greeting,
@@ -1105,10 +1088,11 @@ class CustomerHomeScreenAPIView(APIView):
             "categories": categories,
             "main_categories": main_categories,
             "banners": banners,
+            "random_products": random_products,
+            "favourite_products": favourite_products,
             "top_picks": top_picks,
             "offers": offers,
             "featured_products": featured_products,
-            "featured_collection": featured_collection,
         }
         return Response(payload, status=status.HTTP_200_OK)
 
