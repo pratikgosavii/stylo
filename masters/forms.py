@@ -44,6 +44,17 @@ class size_Form(forms.ModelForm):
         }
 
 
+class color_Form(forms.ModelForm):
+    class Meta:
+        model = color
+        fields = ['name']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control', 'id': 'name'
+            }),
+        }
+
+
 class testimonials_Form(forms.ModelForm):
     class Meta:
         model = testimonials

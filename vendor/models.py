@@ -183,8 +183,6 @@ class product(models.Model):
     sub_category = models.ForeignKey("masters.product_subcategory", related_name='sdfdsz', on_delete=models.CASCADE)
 
     # Pricing details
-    wholesale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     sales_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
    
@@ -200,9 +198,10 @@ class product(models.Model):
 
     # Optional
     brand_name = models.CharField(max_length=255, null=True, blank=True)
-    color = models.CharField(max_length=50, null=True, blank=True)
+    color = models.ForeignKey("masters.color", on_delete=models.SET_NULL, null=True, blank=True, related_name="products")
     fabric_type = models.CharField(max_length=20, choices=FABRIC_TYPE_CHOICES, null=True, blank=True)
     size = models.ForeignKey("masters.size", on_delete=models.CASCADE, null=True, blank=True)
+    size_chart_image = models.ImageField(upload_to='product_size_charts/', null=True, blank=True)
     batch_number = models.CharField(max_length=100, null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
 

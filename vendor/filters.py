@@ -9,7 +9,7 @@ class productFilter(django_filters.FilterSet):
 
     class Meta:
         model = product
-        exclude = ['image', 'gallery_images', 'user']
+        exclude = ['image', 'gallery_images', 'size_chart_image', 'user']
 
     def filter_by_search(self, queryset, name, value):
         if value:
@@ -52,7 +52,6 @@ class ProductFilter(django_filters.FilterSet):
     # Text fields (partial match)
     name = django_filters.CharFilter(lookup_expr="icontains")
     brand_name = django_filters.CharFilter(lookup_expr="icontains")
-    color = django_filters.CharFilter(lookup_expr="icontains")
     description = django_filters.CharFilter(lookup_expr="icontains")
     batch_number = django_filters.CharFilter(lookup_expr="icontains")
     hsn = django_filters.CharFilter(lookup_expr="icontains")
@@ -85,6 +84,7 @@ class ProductFilter(django_filters.FilterSet):
     category = django_filters.ModelChoiceFilter(queryset=product_category.objects.all())
     sub_category = django_filters.ModelChoiceFilter(queryset=product_subcategory.objects.all())
     size_id = django_filters.NumberFilter(field_name="size_id")
+    color_id = django_filters.NumberFilter(field_name="color_id")
 
     # Choice fields
     fabric_type = django_filters.ChoiceFilter(choices=product.FABRIC_TYPE_CHOICES)
@@ -129,4 +129,4 @@ class ProductFilter(django_filters.FilterSet):
 
     class Meta:
         model = product
-        exclude = ["image", "gallery_images"]
+        exclude = ["image", "gallery_images", "size_chart_image"]

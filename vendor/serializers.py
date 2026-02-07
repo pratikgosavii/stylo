@@ -21,7 +21,8 @@ class BannerCampaignSerializer(serializers.ModelSerializer):
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
-    size_detials = size_serializer(source='size', read_only=True)
+    size_details = size_serializer(source='size', read_only=True)
+    color_details = color_serializer(source='color', read_only=True)
 
     avg_rating = serializers.SerializerMethodField()    
     reviews = serializers.SerializerMethodField()
@@ -80,6 +81,7 @@ from rest_framework import serializers
 
 class product_serializer(serializers.ModelSerializer):
     size_details = size_serializer(read_only=True, source='size')
+    color_details = color_serializer(read_only=True, source='color')
     is_favourite = serializers.BooleanField(read_only=True)
     # variants = ProductVariantSerializer(many=True, read_only=True)
     variants = serializers.SerializerMethodField()

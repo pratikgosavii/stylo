@@ -62,9 +62,16 @@ class expense_category(models.Model):
 class size(models.Model):
     name = models.CharField(max_length=255)
 
+    def __str__(self):
+        return self.name
+
+
+class color(models.Model):
+    name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
+
 
 class MainCategory(models.Model):
     name = models.CharField(max_length=255)

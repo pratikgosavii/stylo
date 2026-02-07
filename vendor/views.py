@@ -391,7 +391,7 @@ def generate_barcode(request):
         for i in products:
             item_name = i.name
             mrp = i.mrp
-            discount = i.wholesale_price
+            discount = (float(i.mrp or 0) - float(i.sales_price or 0)) if (i.mrp and i.sales_price) else 0
             sale_price = i.sales_price
             package_date = datetime.now().strftime("%d/%m/%Y")
             note = "The small note here"

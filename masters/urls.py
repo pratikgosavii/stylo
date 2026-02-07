@@ -52,7 +52,12 @@ urlpatterns = [
     path('list-product-category/', list_product_category, name='list_product_category'),  # create or fetch list of admins
     path('delete-product-category/<product_category_id>', delete_product_category, name='delete_product_category'),  # create or fetch list of admins
     path('get-product-category/', get_product_category.as_view(), name='get_product_category'),
-  # create or fetch list of admins
+
+    path('add-color/', add_color, name='add_color'),
+    path('update-color/<color_id>', update_color, name='update_color'),
+    path('list-color/', list_color, name='list_color'),
+    path('delete-color/<color_id>', delete_color, name='delete_color'),
+    path('get-color/', get_color.as_view(), name='get_color'),
 
     path('add-product-subcategory/', add_product_subcategory, name='add_product_subcategory'),  # create or fetch list of admins
     path('update-product-subcategory/<product_subcategory_id>', update_product_subcategory, name='update_product_subcategory'),  # create or fetch list of admins

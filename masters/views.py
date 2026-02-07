@@ -782,7 +782,72 @@ class get_size(ListAPIView):
     filterset_fields = '__all__'  # enables filtering on all fields
 
 
+def add_color(request):
 
+    if request.method == "POST":
+
+        forms = color_Form(request.POST, request.FILES)
+
+        if forms.is_valid():
+            forms.save()
+            return redirect('list_color')
+        else:
+            print(forms.errors)
+            context = {
+                'form': forms
+            }
+            return render(request, 'add_color.html', context)
+
+
+    else:
+
+        return render(request, 'add_color.html', {'form': color_Form()})
+
+
+def update_color(request, color_id):
+
+    instance = color.objects.get(id=color_id)
+
+    if request.method == "POST":
+
+        forms = color_Form(request.POST, request.FILES, instance=instance)
+
+        if forms.is_valid():
+            forms.save()
+            return redirect('list_color')
+        else:
+            print(forms.errors)
+            context = {
+                'form': forms
+            }
+            return render(request, 'add_color.html', context)
+
+    else:
+
+        forms = color_Form(instance=instance)
+
+        return render(request, 'add_color.html', {'form': forms})
+
+
+def list_color(request):
+
+    data = color.objects.all()
+
+    return render(request, 'list_color.html', {'data': data})
+
+
+def delete_color(request, color_id):
+
+    data = color.objects.get(id=color_id).delete()
+
+    return redirect('list_color')
+
+
+class get_color(ListAPIView):
+    queryset = color.objects.all()
+    serializer_class = color_serializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = '__all__'
 
 
 from rest_framework.response import Response
