@@ -90,10 +90,6 @@ class ProductFilter(django_filters.FilterSet):
     fabric_type = django_filters.ChoiceFilter(choices=product.FABRIC_TYPE_CHOICES)
 
     # Boolean fields
-    replacement = django_filters.BooleanFilter()
-    shop_exchange = django_filters.BooleanFilter()
-    shop_warranty = django_filters.BooleanFilter()
-    brand_warranty = django_filters.BooleanFilter()
     tax_inclusive = django_filters.BooleanFilter()
     is_popular = django_filters.BooleanFilter()
     is_featured = django_filters.BooleanFilter()

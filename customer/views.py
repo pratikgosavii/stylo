@@ -136,7 +136,6 @@ class ListProducts(ListAPIView):
     Filter params: search, name, brand_name, color, description, batch_number, hsn,
     min_price, max_price, min_mrp, max_mrp, min_stock, max_stock, in_stock,
     main_category_id, category_id, sub_category_id, store_id, user_id,
-    replacement, shop_exchange, shop_warranty, brand_warranty,
     is_popular, is_featured, is_active,
     ordering: -sales_price (price high to low), sales_price (price low to high),
     -avg_rating (rating high to low), avg_rating (rating low to high),

@@ -189,8 +189,6 @@ class product(models.Model):
    
     hsn = models.CharField(max_length=50, null=True, blank=True)
     gst = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    sgst_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    cgst_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     # Stock
     serial_numbers = models.CharField(max_length=100, blank=True, null=True)
@@ -210,11 +208,6 @@ class product(models.Model):
     image = models.ImageField(upload_to='product_images/', null=True, blank=True)
     gallery_images = models.ImageField(upload_to='product_gallery/', null=True, blank=True)
 
-    replacement = models.BooleanField(default=False)
-    shop_exchange = models.BooleanField(default=False)
-    shop_warranty = models.BooleanField(default=False)
-    brand_warranty = models.BooleanField(default=False)
-
     # Flags
     tax_inclusive = models.BooleanField(default=False)
     is_popular = models.BooleanField(default=False)
@@ -229,10 +222,6 @@ class product(models.Model):
         return self.name
     
     def save(self, *args, **kwargs):
-        if self.gst is not None:
-            half_gst = round(self.gst / 2, 2)
-            self.sgst_rate = half_gst
-            self.cgst_rate = half_gst
         super().save(*args, **kwargs)
 
 
