@@ -145,6 +145,20 @@ class BannerCampaign(models.Model):
 
 
 
+class ProductGalleryImage(models.Model):
+    """Multiple gallery images per product."""
+    product = models.ForeignKey("product", on_delete=models.CASCADE, related_name="gallery_images")
+    image = models.ImageField(upload_to='product_gallery/')
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"Gallery #{self.order} for product {self.product_id}"
+
+
 class product(models.Model):
 
     SIZE_CHOICES = (
@@ -187,7 +201,6 @@ class product(models.Model):
     sales_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
    
-    hsn = models.CharField(max_length=50, null=True, blank=True)
     gst = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
 
     # Stock
@@ -205,8 +218,6 @@ class product(models.Model):
     expiry_date = models.DateField(null=True, blank=True)
 
     description = models.TextField(null=True, blank=True)
-    image = models.ImageField(upload_to='product_images/', null=True, blank=True)
-    gallery_images = models.ImageField(upload_to='product_gallery/', null=True, blank=True)
 
     # Flags
     tax_inclusive = models.BooleanField(default=False)

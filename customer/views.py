@@ -133,7 +133,7 @@ from django.db.models.functions import Coalesce
 class ListProducts(ListAPIView):
     """
     GET /customer/list-products/
-    Filter params: search, name, brand_name, color, description, batch_number, hsn,
+    Filter params: search, name, brand_name, color, description, batch_number,
     min_price, max_price, min_mrp, max_mrp, min_stock, max_stock, in_stock,
     main_category_id, category_id, sub_category_id, store_id, user_id,
     is_popular, is_featured, is_active,

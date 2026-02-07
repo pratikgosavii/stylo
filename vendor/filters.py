@@ -9,14 +9,13 @@ class productFilter(django_filters.FilterSet):
 
     class Meta:
         model = product
-        exclude = ['image', 'gallery_images', 'size_chart_image', 'user']
+        exclude = ['size_chart_image', 'user']
 
     def filter_by_search(self, queryset, name, value):
         if value:
             return queryset.filter(
                 Q(name__icontains=value) |
-                Q(brand_name__icontains=value) |
-                Q(hsn__icontains=value)
+                Q(brand_name__icontains=value)
             )
         return queryset
 
@@ -54,7 +53,6 @@ class ProductFilter(django_filters.FilterSet):
     brand_name = django_filters.CharFilter(lookup_expr="icontains")
     description = django_filters.CharFilter(lookup_expr="icontains")
     batch_number = django_filters.CharFilter(lookup_expr="icontains")
-    hsn = django_filters.CharFilter(lookup_expr="icontains")
 
     # Price ranges (sales_price)
     min_price = django_filters.NumberFilter(field_name="sales_price", lookup_expr="gte")
@@ -125,4 +123,4 @@ class ProductFilter(django_filters.FilterSet):
 
     class Meta:
         model = product
-        exclude = ["image", "gallery_images", "size_chart_image"]
+        exclude = ["size_chart_image"]

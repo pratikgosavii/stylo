@@ -40,6 +40,7 @@ from customer.models import Order, OrderItem
 
 
 from rest_framework.decorators import action
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 import re
 
 
@@ -535,20 +536,30 @@ class get_product(ListAPIView):
 class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = product_serializer
     permission_classes = [IsVendor]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_queryset(self):
         return product.objects.filter(user=self.request.user, is_active=True)
 
+    def _save_gallery_images(self, product_obj, request):
+        """Save gallery_images[] from request.FILES to ProductGalleryImage. Only if files are sent."""
+        files = request.FILES.getlist('gallery_images[]') or request.FILES.getlist('gallery_images')
+        if files:
+            product_obj.gallery_images.all().delete()
+            for i, f in enumerate(files):
+                ProductGalleryImage.objects.create(product=product_obj, image=f, order=i)
+
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        product_obj = serializer.save(user=self.request.user)
+        self._save_gallery_images(product_obj, self.request)
+
+    def perform_update(self, serializer):
+        product_obj = serializer.save()
+        self._save_gallery_images(product_obj, self.request)
 
     def partial_update(self, request, *args, **kwargs):
         kwargs['partial'] = True
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
+        return self.update(request, *args, **kwargs)
 
 
 

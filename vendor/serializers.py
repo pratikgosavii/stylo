@@ -20,9 +20,24 @@ class BannerCampaignSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'is_approved', 'created_at']
 
 
+class ProductGalleryImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductGalleryImage
+        fields = ['id', 'image', 'image_url', 'order']
+
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url if obj.image else None
+
+
 class ProductVariantSerializer(serializers.ModelSerializer):
     size_details = size_serializer(source='size', read_only=True)
     color_details = color_serializer(source='color', read_only=True)
+    gallery_images = serializers.SerializerMethodField()
 
     avg_rating = serializers.SerializerMethodField()    
     reviews = serializers.SerializerMethodField()
@@ -32,6 +47,10 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = product
         fields = '__all__'
+
+    def get_gallery_images(self, obj):
+        qs = obj.gallery_images.all().order_by('order', 'id')
+        return ProductGalleryImageSerializer(qs, many=True, context=self.context).data
 
     def _get_reviews_queryset(self, obj):
         """ Reuse same queryset to avoid double DB hit """
@@ -82,6 +101,7 @@ from rest_framework import serializers
 class product_serializer(serializers.ModelSerializer):
     size_details = size_serializer(read_only=True, source='size')
     color_details = color_serializer(read_only=True, source='color')
+    gallery_images = serializers.SerializerMethodField()
     is_favourite = serializers.BooleanField(read_only=True)
     # variants = ProductVariantSerializer(many=True, read_only=True)
     variants = serializers.SerializerMethodField()
@@ -94,6 +114,10 @@ class product_serializer(serializers.ModelSerializer):
     class Meta:
         model = product
         fields = '__all__'
+
+    def get_gallery_images(self, obj):
+        qs = obj.gallery_images.all().order_by('order', 'id')
+        return ProductGalleryImageSerializer(qs, many=True, context=self.context).data
 
     def _parse_json_field(self, data, key):
         """
@@ -227,6 +251,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
     reviews = serializers.SerializerMethodField()
     vendor_name = serializers.SerializerMethodField(read_only=True)
     spotlight_products = serializers.SerializerMethodField(read_only=True)
+    featured_products = serializers.SerializerMethodField(read_only=True)
     is_favourite = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -257,6 +282,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'reels',
             'banners',
             'spotlight_products',
+            'featured_products',
             'storetag',
             'latitude',
             'longitude',
@@ -294,6 +320,13 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             return []
         qs = obj.user.spotlight_products.all().select_related('product').order_by('id')
         return SpotlightProductSerializer(qs, many=True, context=self.context).data
+
+    def get_featured_products(self, obj):
+        """Products with is_featured=True from this store."""
+        if not obj.user:
+            return []
+        qs = product.objects.filter(user=obj.user, is_featured=True, is_active=True, parent__isnull=True).select_related('category', 'sub_category', 'main_category', 'size', 'color')[:20]
+        return ProductVariantSerializer(qs, many=True, context=self.context).data
 
     def get_store_rating(self, obj):
         """Average product rating for this store (all reviews, visible or not)."""
