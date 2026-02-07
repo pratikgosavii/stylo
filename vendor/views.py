@@ -542,8 +542,20 @@ class ProductViewSet(viewsets.ModelViewSet):
         return product.objects.filter(user=self.request.user, is_active=True)
 
     def _save_gallery_images(self, product_obj, request):
-        """Save gallery_images[] from request.FILES to ProductGalleryImage. Only if files are sent."""
-        files = request.FILES.getlist('gallery_images[]') or request.FILES.getlist('gallery_images')
+        """Save gallery_images from request.FILES to ProductGalleryImage. Accepts: gallery_images[], gallery_images, galleryImages, or any key containing 'gallery'."""
+        files = []
+        # Try common key names
+        for key in ('gallery_images[]', 'gallery_images', 'galleryImages'):
+            files.extend(request.FILES.getlist(key) or [])
+        # Fallback: collect any FILES key containing 'gallery'
+        if not files:
+            for key in getattr(request.FILES, 'keys', lambda: [])():
+                if 'gallery' in key.lower():
+                    files.extend(request.FILES.getlist(key) or [])
+        if not files and hasattr(request.data, 'getlist'):
+            for key in ('gallery_images[]', 'gallery_images'):
+                vals = request.data.getlist(key) or []
+                files.extend([v for v in vals if hasattr(v, 'read')])
         if files:
             product_obj.gallery_images.all().delete()
             for i, f in enumerate(files):
