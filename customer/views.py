@@ -126,7 +126,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from vendor.filters import ProductFilter
 
 
-from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, IntegerField, Avg
+from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, IntegerField, FloatField, Avg
 from django.db.models.functions import Coalesce
 
 
@@ -152,7 +152,7 @@ class ListProducts(ListAPIView):
     def get_queryset(self):
         user = self.request.user
         qs = product.objects.filter(is_active=True).annotate(
-            avg_rating=Coalesce(Avg("items__product_reviews__rating"), 0)
+            avg_rating=Coalesce(Avg("items__product_reviews__rating"), Value(0), output_field=FloatField())
         )
 
         # Order by nearby: use request.user's location (default address or ?latitude=&longitude=)
