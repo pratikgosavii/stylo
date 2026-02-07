@@ -252,6 +252,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
     vendor_name = serializers.SerializerMethodField(read_only=True)
     spotlight_products = serializers.SerializerMethodField(read_only=True)
     featured_products = serializers.SerializerMethodField(read_only=True)
+    popular_products = serializers.SerializerMethodField(read_only=True)
     is_favourite = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -283,6 +284,7 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'banners',
             'spotlight_products',
             'featured_products',
+            'popular_products',
             'storetag',
             'latitude',
             'longitude',
@@ -326,6 +328,13 @@ class VendorStoreSerializer(serializers.ModelSerializer):
         if not obj.user:
             return []
         qs = product.objects.filter(user=obj.user, is_featured=True, is_active=True, parent__isnull=True).select_related('category', 'sub_category', 'main_category', 'size', 'color')[:20]
+        return ProductVariantSerializer(qs, many=True, context=self.context).data
+
+    def get_popular_products(self, obj):
+        """Products with is_popular=True from this store."""
+        if not obj.user:
+            return []
+        qs = product.objects.filter(user=obj.user, is_popular=True, is_active=True, parent__isnull=True).select_related('category', 'sub_category', 'main_category', 'size', 'color')[:20]
         return ProductVariantSerializer(qs, many=True, context=self.context).data
 
     def get_store_rating(self, obj):
