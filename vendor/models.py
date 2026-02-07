@@ -179,6 +179,7 @@ class product(models.Model):
     parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="variants")
     
     name = models.CharField(max_length=255)
+    main_category = models.ForeignKey("masters.MainCategory", on_delete=models.CASCADE, null=True, blank=True, related_name="products")
     category = models.ForeignKey("masters.product_category", on_delete=models.CASCADE)
     sub_category = models.ForeignKey("masters.product_subcategory", related_name='sdfdsz', on_delete=models.CASCADE)
 

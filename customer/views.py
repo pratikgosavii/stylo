@@ -433,21 +433,51 @@ class RandomBannerAPIView(APIView):
 class reelsView(APIView):
     """
     GET /customer/reels/
-    Returns all reels with like_count, comment_count, is_liked, comments (last 10 per reel).
+    Returns all reels with like_count, comment_count, is_liked, comments (last 10 per reel),
+    and 6 featured products from the same store as each reel.
     """
     permission_classes = [IsAuthenticated]
+    FEATURED_PRODUCTS_PER_REEL = 6
 
     def get(self, request):
         from django.db.models import Count
         from .serializers import ReelCommentSerializer
 
-        reels = Reel.objects.all().order_by("-created_at")
+        reels = Reel.objects.select_related("user").all().order_by("-created_at")
         serializer = ReelSerializer(reels, many=True, context={"request": request})
         data = serializer.data
 
         reel_ids = [r["id"] for r in data]
         if not reel_ids:
             return Response(data)
+
+        # reel_id -> vendor user_id
+        reel_user_map = {r.id: r.user_id for r in reels}
+        vendor_user_ids = list({uid for uid in reel_user_map.values() if uid})
+
+        # Bulk: 6 featured products per store (vendor)
+        products_by_user = {}
+        if vendor_user_ids:
+            featured_products = (
+                product.objects.filter(
+                    user_id__in=vendor_user_ids,
+                    is_featured=True,
+                    is_active=True,
+                    parent__isnull=True,
+                )
+                .select_related("user", "main_category", "category", "sub_category", "size", "color")
+                .order_by("?")
+            )
+            for p in featured_products:
+                uid = p.user_id
+                if uid not in products_by_user:
+                    products_by_user[uid] = []
+                if len(products_by_user[uid]) < self.FEATURED_PRODUCTS_PER_REEL:
+                    products_by_user[uid].append(p)
+            for uid in products_by_user:
+                products_by_user[uid] = product_serializer(
+                    products_by_user[uid], many=True, context={"request": request}
+                ).data
 
         # Bulk: like count per reel
         like_counts = dict(
@@ -467,7 +497,7 @@ class reelsView(APIView):
         liked_reel_ids = set(
             ReelLike.objects.filter(reel_id__in=reel_ids, user=request.user).values_list("reel_id", flat=True)
         )
-        # Last 10 comments per reel (for list we include count; fetch comments for each reel for response)
+        # Last 10 comments per reel
         comments_qs = (
             ReelComment.objects.filter(reel_id__in=reel_ids)
             .select_related("user")
@@ -486,6 +516,8 @@ class reelsView(APIView):
             item["comment_count"] = comment_counts.get(rid, 0)
             item["is_liked"] = rid in liked_reel_ids
             item["comments"] = ReelCommentSerializer(comments_by_reel.get(rid, []), many=True).data
+            vendor_id = reel_user_map.get(rid)
+            item["featured_products"] = products_by_user.get(vendor_id, [])[:self.FEATURED_PRODUCTS_PER_REEL]
 
         return Response(data)
 
@@ -1096,7 +1128,7 @@ class CustomerHomeScreenAPIView(APIView):
         product_filter = product.objects.filter(is_active=True, user_id__in=vendor_user_ids)
         if main_category_id:
             try:
-                product_filter = product_filter.filter(category__main_category_id=int(main_category_id))
+                product_filter = product_filter.filter(main_category_id=int(main_category_id))
             except (TypeError, ValueError):
                 pass
 
@@ -1160,15 +1192,19 @@ class CustomerHomeScreenAPIView(APIView):
             return prod_data
 
         # Random products: 10 random from stores within 10km
-        products_random = product_filter.select_related("user", "category", "sub_category").order_by("?")[:self.SECTION_LIMIT]
+        products_random = product_filter.select_related("user", "main_category", "category", "sub_category").order_by("?")[:self.SECTION_LIMIT]
         random_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_random]
 
         # Favourites: 10 user favourites from stores within 10km
-        favourites_qs = (
-            Favourite.objects.filter(user=user, product__user_id__in=vendor_user_ids, product__is_active=True)
-            .select_related("product", "product__user")
-            .order_by("?")[:self.SECTION_LIMIT]
-        )
+        favourites_qs = Favourite.objects.filter(
+            user=user, product__user_id__in=vendor_user_ids, product__is_active=True
+        ).select_related("product", "product__user", "product__main_category")
+        if main_category_id:
+            try:
+                favourites_qs = favourites_qs.filter(product__main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        favourites_qs = favourites_qs.order_by("?")[:self.SECTION_LIMIT]
         favourite_products = []
         for fav in favourites_qs:
             p = fav.product
@@ -1178,7 +1214,7 @@ class CustomerHomeScreenAPIView(APIView):
         # Top picks: 10 products with is_popular from stores within 10km
         products_top_picks = (
             product_filter.filter(is_popular=True)
-            .select_related("user", "category", "sub_category")
+            .select_related("user", "main_category", "category", "sub_category")
             .order_by("?")[:self.SECTION_LIMIT]
         )
         top_picks = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_top_picks]
@@ -1186,12 +1222,12 @@ class CustomerHomeScreenAPIView(APIView):
         # Featured products: 10 from stores within 10km
         products_featured = (
             product_filter.filter(is_featured=True)
-            .select_related("user", "category", "sub_category")
+            .select_related("user", "main_category", "category", "sub_category")
             .order_by("?")[:self.SECTION_LIMIT]
         )
         if not products_featured.exists():
             products_featured = (
-                product_filter.select_related("user", "category", "sub_category")
+                product_filter.select_related("user", "main_category", "category", "sub_category")
                 .exclude(id__in=[p.get("id") for p in random_products if isinstance(p, dict) and p.get("id")])
                 .order_by("?")[:self.SECTION_LIMIT]
             )
