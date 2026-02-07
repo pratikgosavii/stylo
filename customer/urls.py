@@ -58,10 +58,12 @@ path('liked-products-and-stores/', LikedProductsAndStoresAPIView.as_view(), name
 path('home/', CustomerHomeScreenAPIView.as_view(), name='customer_home_screen'),
 path('top-picks/', TopPicksAPIView.as_view(), name='customer_top_picks'),
 path('spotlight-products/', SpotlightProductsAPIView.as_view(), name='customer_spotlight_products'),
+
 path('main-categories/', MainCategoriesListAPIView.as_view(), name='customer_main_categories'),
 path('main-categories/<int:main_category_id>/categories-tree/', CategoriesTreeByMainCategoryAPIView.as_view(), name='customer_categories_tree'),
 path('categories/', CategoriesListAPIView.as_view(), name='customer_categories'),
 path('subcategories/', SubcategoriesListAPIView.as_view(), name='customer_subcategories'),
+
 path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by-subcategory'),
 
 

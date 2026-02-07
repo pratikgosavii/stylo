@@ -1,6 +1,12 @@
 from django.urls import path
 
 from .views import *
+from customer.views import (
+    MainCategoriesListAPIView,
+    CategoriesTreeByMainCategoryAPIView,
+    CategoriesListAPIView,
+    SubcategoriesListAPIView,
+)
 
 from django.conf import settings
 from django.conf.urls.static import static
@@ -33,6 +39,10 @@ urlpatterns = [
    
     
     path("vendor-stores/", VendorStoreAPIView.as_view(), name="vendor-store-list"),
+    path('main-categories/', MainCategoriesListAPIView.as_view(), name='vendor_main_categories'),
+    path('main-categories/<int:main_category_id>/categories-tree/', CategoriesTreeByMainCategoryAPIView.as_view(), name='vendor_categories_tree'),
+    path('categories/', CategoriesListAPIView.as_view(), name='vendor_categories'),
+    path('subcategories/', SubcategoriesListAPIView.as_view(), name='vendor_subcategories'),
     path("orders/<int:order_id>/assign-delivery-boy/", AssignDeliveryBoyAPIView.as_view(), name="assign-delivery-boy"),
     path("orders/<int:order_id>/accept/", AcceptOrderAPIView.as_view(), name="vendor-accept-order"),
     path("orders/<int:order_id>/reject/", RejectOrderAPIView.as_view(), name="vendor-reject-order"),
