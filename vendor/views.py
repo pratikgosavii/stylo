@@ -40,6 +40,7 @@ from customer.models import Order, OrderItem
 
 
 from rest_framework.decorators import action
+import re
 
 
 class VendorStoreAPIView(APIView):
@@ -55,33 +56,54 @@ class VendorStoreAPIView(APIView):
             return Response({"detail": "Store not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request):
-        """Update the logged-in vendor's store. Same API accepts cover_media (multiple files). Type inferred from Content-Type."""
+        """Update the logged-in vendor's store. Same API accepts cover_media (multiple files) or cover_media_<id> to update a particular cover photo."""
+        return self._update_store(request)
+
+    def patch(self, request):
+        """Partial update of store. Supports cover_media_<id>=file to update a particular cover photo."""
+        return self._update_store(request)
+
+    def _update_store(self, request):
         try:
             store = vendor_store.objects.get(user=request.user)
             serializer = VendorStoreSerializer(store, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save(user=request.user)
-                # Single key: cover_media; or legacy cover_photos + cover_videos. Type inferred from Content-Type.
-                files = request.FILES.getlist('cover_media') or request.FILES.getlist('cover_media[]')
-                if not files:
-                    cover_photos = request.FILES.getlist('cover_photos') or request.FILES.getlist('cover_photos[]')
-                    cover_videos = request.FILES.getlist('cover_videos') or request.FILES.getlist('cover_videos[]')
-                    for f in cover_photos:
-                        files.append((f, 'image'))
-                    for f in cover_videos:
-                        files.append((f, 'video'))
-                else:
-                    files = [(f, 'video' if (getattr(f, 'content_type', '') or '').lower().startswith('video/') else 'image') for f in files]
-                if files:
-                    store.cover_media.all().delete()
-                    for i, item in enumerate(files):
-                        f, media_type = item if isinstance(item, tuple) else (item, 'image')
-                        StoreCoverMedia.objects.create(store=store, media_type=media_type, media=f, order=i)
+                # Update particular cover photo: cover_media_<id>=file (e.g. cover_media_5)
+                for key in request.FILES:
+                    m = re.match(r'^cover_media_(\d+)$', key)
+                    if m:
+                        cover_id = int(m.group(1))
+                        try:
+                            obj = StoreCoverMedia.objects.get(id=cover_id, store=store)
+                            obj.media = request.FILES[key]
+                            obj.save()
+                        except StoreCoverMedia.DoesNotExist:
+                            pass
+                # Full replace: cover_media, cover_photos, cover_videos (only if no cover_media_<id> was used)
+                has_specific = any(re.match(r'^cover_media_\d+$', k) for k in request.FILES)
+                if not has_specific:
+                    files = request.FILES.getlist('cover_media') or request.FILES.getlist('cover_media[]')
+                    if not files:
+                        cover_photos = request.FILES.getlist('cover_photos') or request.FILES.getlist('cover_photos[]')
+                        cover_videos = request.FILES.getlist('cover_videos') or request.FILES.getlist('cover_videos[]')
+                        for f in cover_photos:
+                            files.append((f, 'image'))
+                        for f in cover_videos:
+                            files.append((f, 'video'))
+                    else:
+                        files = [(f, 'video' if (getattr(f, 'content_type', '') or '').lower().startswith('video/') else 'image') for f in files]
+                    if files:
+                        store.cover_media.all().delete()
+                        for i, item in enumerate(files):
+                            f, media_type = item if isinstance(item, tuple) else (item, 'image')
+                            StoreCoverMedia.objects.create(store=store, media_type=media_type, media=f, order=i)
                 out = VendorStoreSerializer(store, context={'request': request}).data
                 return Response(out, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except vendor_store.DoesNotExist:
-            return Response({"detail": "Store not found."}, status=status.HTTP_404_NOT_FOUND)      
+            return Response({"detail": "Store not found."}, status=status.HTTP_404_NOT_FOUND)
+
 
 @login_required(login_url='login_admin')
 def add_coupon(request):
