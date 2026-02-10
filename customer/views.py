@@ -730,6 +730,97 @@ class LikedProductsAndStoresAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class NeedProductsAPIView(APIView):
+    """
+    GET /customer/need-products/?product_id=<id>
+    Returns:
+      - more_products_from_store: other products from the same store (excluding the given product).
+      - you_may_also_like: products from other stores in the same category/main category.
+    Each product includes full store details (store, store_name, store_id, distance_km when user address available).
+    Query params: product_id (required), limit (optional, default 10 per section).
+    """
+    permission_classes = [IsAuthenticated]
+    DEFAULT_LIMIT = 10
+
+    def get(self, request):
+        product_id = request.query_params.get("product_id")
+        if not product_id:
+            return Response({"detail": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product_id = int(product_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Invalid product_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        limit = request.query_params.get("limit", self.DEFAULT_LIMIT)
+        try:
+            limit = min(int(limit), 20)
+        except (TypeError, ValueError):
+            limit = self.DEFAULT_LIMIT
+
+        from django.db.models import Q
+        # Resolve product (use parent if this is a variant so store/category are consistent)
+        prod = product.objects.filter(is_active=True).select_related("user", "main_category", "category", "sub_category").filter(
+            Q(id=product_id) | Q(parent_id=product_id)
+        ).first()
+        if not prod:
+            return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        # Use root product for store/category
+        root = prod.parent if getattr(prod, "parent_id", None) else prod
+
+        def enrich(prod_list, store_by_uid):
+            out = []
+            for p in prod_list:
+                s = store_by_uid.get(p.user_id)
+                data = product_serializer(p, context={"request": request}).data
+                if isinstance(data, dict):
+                    data["store"] = VendorStoreSerializer(s, context={"request": request}).data if s else None
+                    data["store_name"] = s.name if s else None
+                    data["store_id"] = s.id if s else None
+                    if request.user.is_authenticated and s and s.latitude is not None and s.longitude is not None:
+                        addr = Address.objects.filter(user=request.user, is_default=True).first()
+                        if addr and addr.latitude is not None and addr.longitude is not None:
+                            data["distance_km"] = _haversine_km(
+                                float(addr.latitude), float(addr.longitude),
+                                float(s.latitude), float(s.longitude)
+                            )
+                        else:
+                            data["distance_km"] = None
+                    else:
+                        data["distance_km"] = None
+                out.append(data)
+            return out
+
+        # Store lookup for other stores (for you_may_also_like)
+        vendor_user_ids = set()
+        more_qs = product.objects.filter(
+            user_id=root.user_id, is_active=True, parent__isnull=True
+        ).exclude(id=root.id).select_related("user", "main_category", "category", "sub_category").order_by("?")[:limit]
+        you_like_qs = product.objects.filter(
+            is_active=True, parent__isnull=True
+        ).exclude(user_id=root.user_id)
+        if root.main_category_id:
+            you_like_qs = you_like_qs.filter(main_category_id=root.main_category_id)
+        elif root.category_id:
+            you_like_qs = you_like_qs.filter(category_id=root.category_id)
+        you_like_qs = you_like_qs.select_related("user", "main_category", "category", "sub_category").order_by("?")[:limit]
+
+        for p in more_qs:
+            vendor_user_ids.add(p.user_id)
+        for p in you_like_qs:
+            vendor_user_ids.add(p.user_id)
+        vendor_user_ids.add(root.user_id)
+        stores_list = list(vendor_store.objects.filter(user_id__in=vendor_user_ids, is_active=True))
+        store_by_uid = {s.user_id: s for s in stores_list}
+
+        more_products_from_store = enrich(list(more_qs), store_by_uid)
+        you_may_also_like = enrich(list(you_like_qs), store_by_uid)
+
+        return Response({
+            "more_products_from_store": more_products_from_store,
+            "you_may_also_like": you_may_also_like,
+        }, status=status.HTTP_200_OK)
+
+
 class offersView(APIView):
     """GET: List active store offers (promotional: discount %, free delivery, etc.) currently valid for the customer."""
     permission_classes = [IsAuthenticated]
