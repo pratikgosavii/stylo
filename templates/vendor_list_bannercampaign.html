@@ -97,9 +97,11 @@
                                                         <td>{{ banner.is_approved|yesno:"Yes,No" }}</td>
                                                         <td>{{ banner.created_at|date:"d M Y" }}</td>
                                                         <td>
-                                                            <a href="{% url 'approve_bannercampaign' banner.id %}">
-                                                                <i class="bi bi-pencil-square text-primary" title="Edit"></i>
-                                                            </a>
+                                                            {% if not banner.is_approved %}
+                                                                <a href="{% url 'approve_bannercampaign' banner.id %}" class="btn btn-sm btn-success" title="Approve">
+                                                                    <i class="bi bi-check-circle"></i> Approve
+                                                                </a>
+                                                            {% endif %}
                                                         </td>
                                                     </tr>
                                                 {% endfor %}
