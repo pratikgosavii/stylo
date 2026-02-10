@@ -1454,7 +1454,7 @@ class CustomerHomeScreenAPIView(APIView):
             prod_data = product_serializer(prod, context={"request": request}).data
             if isinstance(prod_data, dict):
                 prod_data["store_name"] = store.name if store else None
-                prod_data["store_id"] = store.id if store else None
+                prod_data["store"] = store.id if store else None
                 prod_data["distance_km"] = distance_km
                 prod_data["discount_percent"] = discount_percent
                 # Full store details
@@ -1516,7 +1516,7 @@ class CustomerHomeScreenAPIView(APIView):
                 "title": b.campaign_name or "",
                 "description": "",
                 "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
-                "store_id": store_obj.id if store_obj else None,
+                "store": store_obj.id if store_obj else None,
                 "store_name": store_obj.name if store_obj else None,
                 "main_category_id": b.main_category_id,
             })
