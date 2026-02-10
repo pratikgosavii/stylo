@@ -1015,7 +1015,7 @@ def list_home_banner(request):
 @login_required(login_url='login_admin')
 def vendor_list_bannercampaign(request):
 
-    data = BannerCampaign.objects.filter(user = request.user)
+    data = BannerCampaign.objects.all()
     context = {
         'data': data
     }
