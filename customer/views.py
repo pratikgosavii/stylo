@@ -1760,6 +1760,51 @@ class SubcategoriesListAPIView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class CategoriesWithSubcategoriesAPIView(APIView):
+    """
+    GET /customer/categories-with-subcategories/?main_category_id=4
+    Returns categories (optionally filtered by main_category_id), each with nested subcategories.
+    Same shape as categories list but each item has a "subcategories" array.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        main_category_id = request.query_params.get("main_category_id")
+        qs = product_category.objects.select_related("main_category").only("id", "main_category_id", "name", "image")
+        if main_category_id:
+            try:
+                qs = qs.filter(main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        categories_qs = qs.order_by("name")
+        category_ids = list(categories_qs.values_list("id", flat=True))
+
+        sub_by_cat = {}
+        if category_ids:
+            sub_qs = product_subcategory.objects.filter(category_id__in=category_ids).only(
+                "id", "category_id", "name", "image"
+            ).order_by("category_id", "name")
+            for s in sub_qs:
+                sub_by_cat.setdefault(s.category_id, []).append({
+                    "id": s.id,
+                    "category_id": s.category_id,
+                    "name": s.name,
+                    "image": request.build_absolute_uri(s.image.url) if s.image else None,
+                })
+
+        data = [
+            {
+                "id": c.id,
+                "main_category_id": c.main_category_id,
+                "name": c.name,
+                "image": request.build_absolute_uri(c.image.url) if c.image else None,
+                "subcategories": sub_by_cat.get(c.id, []),
+            }
+            for c in categories_qs
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+
+
 class CategoriesTreeByMainCategoryAPIView(APIView):
     """
     GET /customer/main-categories/<main_category_id>/categories-tree/

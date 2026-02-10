@@ -64,6 +64,7 @@ path('spotlight-products/', SpotlightProductsAPIView.as_view(), name='customer_s
 path('main-categories/', MainCategoriesListAPIView.as_view(), name='customer_main_categories'),
 path('main-categories/<int:main_category_id>/categories-tree/', CategoriesTreeByMainCategoryAPIView.as_view(), name='customer_categories_tree'),
 path('categories/', CategoriesListAPIView.as_view(), name='customer_categories'),
+path('categories-with-subcategories/', CategoriesWithSubcategoriesAPIView.as_view(), name='customer_categories_with_subcategories'),
 path('subcategories/', SubcategoriesListAPIView.as_view(), name='customer_subcategories'),
 
 path('stores-by-subcategory/', StoreBySubCategoryView.as_view(), name='stores-by-subcategory'),
