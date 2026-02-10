@@ -637,6 +637,23 @@ class FavouriteViewSet(viewsets.ViewSet):
     
 
 
+def _store_with_products_response(store, request, product_serializer, VendorStoreSerializer):
+    """Build response with full store details and store's products (each product includes full store)."""
+    if not store:
+        return None
+    store_data = VendorStoreSerializer(store, context={"request": request}).data
+    products_qs = product.objects.filter(user_id=store.user_id, is_active=True, parent__isnull=True).select_related("main_category", "category", "sub_category")[:50]
+    products_data = []
+    for p in products_qs:
+        prod_data = product_serializer(p, context={"request": request}).data
+        if isinstance(prod_data, dict):
+            prod_data["store"] = store_data
+            prod_data["store_name"] = store.name
+            prod_data["store_id"] = store.id
+        products_data.append(prod_data)
+    return {"store": store_data, "products": products_data}
+
+
 class FavouriteStoreViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -644,18 +661,41 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
     def add(self, request):
         store_id = request.data.get("store_id")
         user = request.user
+        if store_id is None:
+            return Response({"detail": "store_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            store = vendor_store.objects.get(id=store_id, is_active=True)
+        except vendor_store.DoesNotExist:
+            return Response({"detail": "Store not found."}, status=status.HTTP_404_NOT_FOUND)
 
         fav, created = FavouriteStore.objects.get_or_create(user=user, store_id=store_id)
-        if created:
-            return Response({"status": "added"}, status=status.HTTP_201_CREATED)
-        return Response({"status": "already exists"}, status=status.HTTP_200_OK)
+        payload = _store_with_products_response(store, request, product_serializer, VendorStoreSerializer)
+        payload["status"] = "added" if created else "already exists"
+        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(payload, status=status_code)
 
     @action(detail=False, methods=["post"])
     def remove(self, request):
         store_id = request.data.get("store_id")
         user = request.user
+        if store_id is None:
+            return Response({"detail": "store_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        store = vendor_store.objects.filter(id=store_id).first()
         FavouriteStore.objects.filter(user=user, store_id=store_id).delete()
-        return Response({"status": "removed"}, status=status.HTTP_200_OK)
+        payload = {"status": "removed"}
+        if store:
+            payload["store"] = VendorStoreSerializer(store, context={"request": request}).data
+            products_qs = product.objects.filter(user_id=store.user_id, is_active=True, parent__isnull=True).select_related("main_category", "category", "sub_category")[:50]
+            products_data = []
+            for p in products_qs:
+                prod_data = product_serializer(p, context={"request": request}).data
+                if isinstance(prod_data, dict):
+                    prod_data["store"] = payload["store"]
+                    prod_data["store_name"] = store.name
+                    prod_data["store_id"] = store.id
+                products_data.append(prod_data)
+            payload["products"] = products_data
+        return Response(payload, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=["get"])
     def my_favourites(self, request):
@@ -1188,6 +1228,10 @@ class CustomerHomeScreenAPIView(APIView):
                 prod_data["store_id"] = store.id if store else None
                 prod_data["distance_km"] = distance_km
                 prod_data["discount_percent"] = discount_percent
+                # Full store details
+                prod_data["store"] = VendorStoreSerializer(store, context={"request": request}).data if store else None
+                if prod_data.get("store") and isinstance(prod_data["store"], dict):
+                    prod_data["store"]["distance_km"] = distance_km
             return prod_data
 
         # Random products: 10 random from stores within 10km
@@ -1261,6 +1305,70 @@ class CustomerHomeScreenAPIView(APIView):
             "featured_products": featured_products,
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class StoreNearMeAPIView(APIView):
+    """
+    GET /customer/store-near-me/
+    Returns stores near the customer within 10km, optionally filtered by main_category and category.
+    Query params: main_category (main_category_id), category (category_id), latitude, longitude (optional; else default address).
+    """
+    permission_classes = [IsAuthenticated]
+    NEARBY_KM = 10
+
+    def get(self, request):
+        main_category_id = request.query_params.get("main_category")
+        category_id = request.query_params.get("category")
+        req_lat = request.query_params.get("latitude")
+        req_lon = request.query_params.get("longitude")
+
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=request.user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+
+        product_qs = product.objects.filter(is_active=True)
+        if main_category_id:
+            try:
+                product_qs = product_qs.filter(main_category_id=int(main_category_id))
+            except (TypeError, ValueError):
+                pass
+        if category_id:
+            try:
+                product_qs = product_qs.filter(category_id=int(category_id))
+            except (TypeError, ValueError):
+                pass
+        vendor_user_ids = list(product_qs.values_list("user_id", flat=True).distinct())
+
+        stores_qs = vendor_store.objects.filter(
+            is_active=True,
+            user_id__in=vendor_user_ids,
+            latitude__isnull=False,
+            longitude__isnull=False,
+        )
+        stores_list = list(stores_qs)
+
+        results = []
+        for s in stores_list:
+            dist = _haversine_km(user_lat or 0, user_lon or 0, float(s.latitude), float(s.longitude))
+            if user_lat is not None and user_lon is not None and dist <= self.NEARBY_KM:
+                store_data = VendorStoreSerializer(s, context={"request": request}).data
+                if isinstance(store_data, dict):
+                    store_data["distance_km"] = dist
+                results.append(store_data)
+        results.sort(key=lambda x: x.get("distance_km", 999999))
+
+        return Response({"stores": results}, status=status.HTTP_200_OK)
 
 
 class TopPicksAPIView(APIView):

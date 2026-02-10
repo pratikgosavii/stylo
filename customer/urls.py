@@ -54,6 +54,7 @@ path('products/search/', ProductSearchAPIView.as_view(), name='search-products')
 
 path('stores-by-category/', StoreByCategoryView.as_view(), name='stores-by-category'),
 path('sellers-near-you/', SellersNearYouAPIView.as_view(), name='customer-sellers-near-you'),
+path('store-near-me/', StoreNearMeAPIView.as_view(), name='store_near_me'),
 path('liked-products-and-stores/', LikedProductsAndStoresAPIView.as_view(), name='customer-liked-products-and-stores'),
 path('home/', CustomerHomeScreenAPIView.as_view(), name='customer_home_screen'),
 path('top-picks/', TopPicksAPIView.as_view(), name='customer_top_picks'),
