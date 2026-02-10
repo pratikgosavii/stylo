@@ -20,6 +20,25 @@ class BannerCampaignSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'is_approved', 'created_at']
 
 
+class BannerCampaignWithProductSerializer(serializers.ModelSerializer):
+    """Banner with product_id and full product object when product is set."""
+    product_id = serializers.IntegerField(source='product_id', read_only=True)
+    product = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BannerCampaign
+        fields = [
+            'id', 'user', 'main_category', 'store', 'product_id', 'product',
+            'banner_image', 'campaign_name', 'is_approved', 'created_at',
+        ]
+        read_only_fields = ['user', 'is_approved', 'created_at']
+
+    def get_product(self, obj):
+        if not obj.product_id or not obj.product:
+            return None
+        return product_serializer(obj.product, context=self.context).data
+
+
 class ProductGalleryImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
 
@@ -276,7 +295,7 @@ class StoreCoverMediaSerializer(serializers.ModelSerializer):
 class VendorStoreSerializer(serializers.ModelSerializer):
     # Nested child serializers
     reels = ReelSerializer(source='user.reel_set', many=True, read_only=True)
-    banners = BannerCampaignSerializer(source='user.banners', many=True, read_only=True)
+    banners = BannerCampaignWithProductSerializer(source='user.banners', many=True, read_only=True)
     # Single combined list of cover media (photos + videos); each item has media_type
     cover_media = serializers.SerializerMethodField(read_only=True)
 
