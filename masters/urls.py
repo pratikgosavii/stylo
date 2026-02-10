@@ -95,7 +95,7 @@ urlpatterns = [
     path('update-home-banner/<home_banner_id>', update_home_banner, name='update_home_banner'),  # create or fetch list of admins
     path('list-home-banner/', list_home_banner, name='list_home_banner'),  # create or fetch list of admins
     path('vendor-list-bannercampaign/', vendor_list_bannercampaign, name='vendor_list_bannercampaign'),  # create or fetch list of admins
-    path('approve-bannercampaign/', approve_bannercampaign, name='approve_bannercampaign'),  # create or fetch list of admins
+    path('approve-bannercampaign/<banner_id>', approve_bannercampaign, name='approve_bannercampaign'),  # create or fetch list of admins
     path('delete-home-banner/<home_banner_id>', delete_home_banner, name='delete_home_banner'),  # create or fetch list of admins
     path('get-home-banner/', get_home_banner, name='get_home_banner'), 
 
