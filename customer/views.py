@@ -1433,7 +1433,7 @@ class CustomerHomeScreenAPIView(APIView):
                 "title": b.campaign_name or "",
                 "description": "",
                 "image": request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
-                "store_id": store_obj.id if store_obj else None,
+                "store": store_obj.id if store_obj else None,
                 "store_name": store_obj.name if store_obj else None,
                 "product_id": b.product_id if b.product_id else None,
                 "main_category_id": b.main_category_id,
