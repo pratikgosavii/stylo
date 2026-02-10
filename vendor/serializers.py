@@ -22,7 +22,7 @@ class BannerCampaignSerializer(serializers.ModelSerializer):
 
 class BannerCampaignWithProductSerializer(serializers.ModelSerializer):
     """Banner with product_id and full product object when product is set."""
-    product_id = serializers.IntegerField(source='product_id', read_only=True)
+    product_id = serializers.IntegerField(read_only=True)
     product = serializers.SerializerMethodField()
 
     class Meta:
