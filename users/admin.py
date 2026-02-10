@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, DeviceToken, KYC
+from .models import User, OTP, DeviceToken, KYC
 from .forms import *  # Import your custom form
 
 class CustomUserAdmin(UserAdmin):
@@ -30,5 +30,6 @@ class CustomUserAdmin(UserAdmin):
     ordering = ('mobile',)
 
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(OTP)
 admin.site.register(DeviceToken)
 admin.site.register(KYC)

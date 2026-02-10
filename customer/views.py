@@ -728,7 +728,7 @@ def _store_with_products_response(store, request, product_serializer, VendorStor
         if isinstance(prod_data, dict):
             prod_data["store"] = store_data
             prod_data["store_name"] = store.name
-            prod_data["store_id"] = store.id
+            prod_data["store"] = store.id
             prod_data["distance_km"] = distance_km
             prod_data["travel_time_minutes"] = store_data.get("travel_time_minutes")
         products_data.append(prod_data)
