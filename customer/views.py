@@ -1359,7 +1359,7 @@ class CustomerHomeScreenAPIView(APIView):
         # Stores nearby: only within 10km
         stores_qs = vendor_store.objects.filter(
             is_active=True, latitude__isnull=False, longitude__isnull=False
-        ).only("id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude")
+        ).only("id", "user_id", "name", "profile_image")
         stores_list = list(stores_qs)
         stores_nearby = []
         vendor_user_ids = []
@@ -1862,55 +1862,45 @@ class HomeScreenView(APIView):
             category_ids = list(categories_qs.values_list('id', flat=True))
 
             # -------------------------
-            # Fetch product batch (limit 6) with related prefetches
+            # Fetch product batch (limit 6): avoid expensive ORDER BY RAND()
+            # Get IDs first, sample in Python, then fetch full objects
             # -------------------------
-            products_qs = product.objects.filter(
+            product_ids_qs = product.objects.filter(
                 category_id__in=category_ids,
-                is_active=True
-            ).select_related(
-                'user', 'category', 'sub_category'
-            ).prefetch_related(
-                'variants',
-                'variants__size',
-                'user__vendor_store'
-            ).order_by('?')[:6]  # random 6 products for this main category
-
-            products = list(products_qs)  # evaluate
+                is_active=True,
+                parent__isnull=True
+            ).values_list('id', flat=True)
+            all_ids = list(product_ids_qs[:500])
+            sampled_ids = random.sample(all_ids, min(6, len(all_ids))) if all_ids else []
+            products = []
+            if sampled_ids:
+                products = list(
+                    product.objects.filter(id__in=sampled_ids)
+                    .select_related('user', 'category', 'sub_category', 'main_category')
+                    .prefetch_related(
+                        'variants',
+                        'variants__size',
+                        'user__vendor_store'
+                    )
+                )
+                id_to_pos = {pid: i for i, pid in enumerate(sampled_ids)}
+                products.sort(key=lambda p: id_to_pos.get(p.id, 999))
 
             product_ids = [p.id for p in products]
 
             # -------------------------
-            # Fetch reviews for all products in batch — single query
+            # Fetch reviews for all products in batch — single query, key by product_id
             # -------------------------
             reviews_map = {}
             if product_ids:
-                # Reviews are referenced via order_item__product in your serializer.
-                # We fetch reviews that relate to these products in one shot.
-                reviews_qs = Review.objects.filter(order_item__product_id__in=product_ids).select_related('order_item', 'user')
-                # Serialize them (use existing ReviewSerializer)
-                serialized_reviews = ReviewSerializer(reviews_qs, many=True, context={'request': request}).data
-
-                # Build map: product_id -> list of review dicts
-                for r in serialized_reviews:
-                    # Try to get product_id from nested order_item if serializer provides it,
-                    # else attempt to read it from r['order_item']['product'] etc.
-                    # This depends on your ReviewSerializer output; adapt if needed.
-                    prod_id = None
-                    # safe extraction — best-effort
-                    try:
-                        prod_id = r.get('order_item', {}).get('product')
-                    except Exception:
-                        prod_id = None
-
-                    # fallback: attempt to read order_item -> id and then map using DB (rare)
-                    if not prod_id:
-                        # try to pull from related objects on reviews_qs if needed
-                        # since serialized_reviews order matches reviews_qs order, we can map by index,
-                        # but easier is to re-query minimal mapping from DB (cheap for small batch)
-                        pass
-
-                    if prod_id:
-                        reviews_map.setdefault(prod_id, []).append(r)
+                reviews_qs = Review.objects.filter(
+                    order_item__product_id__in=product_ids
+                ).select_related('order_item', 'user')
+                for rev in reviews_qs:
+                    prod_id = rev.order_item.product_id
+                    reviews_map.setdefault(prod_id, []).append(
+                        ReviewSerializer(rev, context={'request': request}).data
+                    )
 
             # -------------------------
             # Stores: determine user_ids from products we fetched (fast)
@@ -1923,25 +1913,32 @@ class HomeScreenView(APIView):
             stores_list = list(stores_qs)
             # pick random up to 6
             random_stores = random.sample(stores_list, min(6, len(stores_list)))
-            # ✅ Get approved banner campaigns (latest or random as per your choice)
+            # Single query for all banners for these stores (avoids N+1)
+            banners_by_user = {}
+            if user_ids:
+                banners_qs = BannerCampaign.objects.filter(
+                    user_id__in=user_ids,
+                    is_approved=True
+                ).order_by('user_id', '-created_at')
+                for b in banners_qs:
+                    uid = b.user_id
+                    if uid not in banners_by_user:
+                        banners_by_user[uid] = []
+                    if len(banners_by_user[uid]) < 5:
+                        banners_by_user[uid].append(b)
+
             stores_data = []
             for s in random_stores:
-                store_banners = BannerCampaign.objects.filter(
-                    user_id=s.user_id,
-                    is_approved=True
-                ).order_by('-created_at')[:5]
-
+                store_banners = banners_by_user.get(s.user_id) or []
                 store_banners_data = [
                     {
                         'id': b.id,
                         'banner_image': request.build_absolute_uri(b.banner_image.url) if b.banner_image else None,
                     } for b in store_banners
                 ]
-
                 distance_km = None
                 if user_lat is not None and user_lon is not None and s.latitude is not None and s.longitude is not None:
                     distance_km = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
-
                 stores_data.append({
                     'id': s.id,
                     'name': s.name,
@@ -2010,28 +2007,38 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
  
 class CustomerProductReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.all()
+    """
+    Rate and review an order item (product from a completed order).
+    Base URL: /customer/customer-product-review/
+    - POST: create review (body: order_item, rating, comment, photo, etc.)
+    - GET list: only this customer's reviews
+    - GET/PUT/PATCH/DELETE <id>: only this customer's review
+    Checks on create: customer has the order, order is completed, not already reviewed.
+    """
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        # Only this customer's reviews
+        return Review.objects.filter(user=self.request.user).select_related("order_item", "order_item__order", "order_item__product").order_by("-created_at")
 
     def perform_create(self, serializer):
         order_item = serializer.validated_data['order_item']
         user = self.request.user
 
-        # ✅ Block duplicate review
+        # Block duplicate review
         if Review.objects.filter(order_item=order_item, user=user).exists():
             raise ValidationError("You have already reviewed this product.")
 
-        # ✅ Ensure user actually purchased THIS exact order item
+        # Ensure user actually purchased THIS exact order item (customer has the order)
         if order_item.order.user != user:
             raise ValidationError("You can only review products you have purchased.")
 
-        # ✅ Ensure order was completed (delivery lives on Order) before review
+        # Ensure order was completed (delivery) before review
         if getattr(order_item.order, "status", None) != "completed":
             raise ValidationError("You can only review after delivery.")
 
-        # ✅ Save safely
         serializer.save(user=user)
 
 

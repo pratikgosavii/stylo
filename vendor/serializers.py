@@ -151,13 +151,24 @@ class product_serializer(serializers.ModelSerializer):
             self._reviews_cache[obj.id] = Review.objects.filter(order_item__product=obj)
         return self._reviews_cache[obj.id]
 
-
     def get_reviews(self, obj):
+        # Use pre-fetched reviews_map from context when present (avoids N+1 in list views)
+        reviews_map = self.context.get('reviews_map')
+        if reviews_map is not None:
+            return reviews_map.get(obj.id, [])
         from customer.serializers import ReviewSerializer
         reviews = self._get_reviews_queryset(obj)
         return ReviewSerializer(reviews, many=True).data
 
     def get_avg_rating(self, obj):
+        # Use pre-fetched reviews_map when present to avoid extra query
+        reviews_map = self.context.get('reviews_map')
+        if reviews_map is not None:
+            revs = reviews_map.get(obj.id, [])
+            if not revs:
+                return 0.0
+            total = sum(r.get('rating') or 0 for r in revs if isinstance(r, dict))
+            return round(total / len(revs), 1)
         from django.db.models import Avg
         reviews = self._get_reviews_queryset(obj)
         avg = reviews.aggregate(avg=Avg('rating'))['avg']
