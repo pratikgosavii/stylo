@@ -893,7 +893,7 @@ class BannerCampaignViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"store": "Vendor store not found for this user."})
             serializer.save(user=self.request.user, store=store, product=None)
         else:
-            serializer.save(user=self.request.user, store=None, product=None)
+            serializer.save(user=self.request.user)
 
 
 
