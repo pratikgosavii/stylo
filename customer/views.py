@@ -122,6 +122,7 @@ from vendor.serializers import product_serializer
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import OrderingFilter
+from rest_framework.pagination import LimitOffsetPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from vendor.filters import ProductFilter
 
@@ -130,28 +131,40 @@ from django.db.models import Exists, OuterRef, Value, BooleanField, Case, When, 
 from django.db.models.functions import Coalesce
 
 
+class ListProductsPagination(LimitOffsetPagination):
+    """Lazy loading: 10 products per request. Use ?limit=10&offset=0, then offset=10, 20, ..."""
+    default_limit = 10
+    max_limit = 100
+    limit_query_param = "limit"
+    offset_query_param = "offset"
+
+
 class ListProducts(ListAPIView):
     """
     GET /customer/list-products/
-    Filter params: search, name, brand_name, color, description, batch_number,
-    min_price, max_price, min_mrp, max_mrp, min_stock, max_stock, in_stock,
-    main_category_id, category_id, sub_category_id, store_id, user_id,
-    is_popular, is_featured, is_active,
-    ordering: -sales_price (price high to low), sales_price (price low to high),
-    -avg_rating (rating high to low), avg_rating (rating low to high),
-    name, -created_at, stock, mrp, etc.
+    Lazy loading: 10 products per request. Query params: limit (default 10), offset (default 0).
+    Response: { "count": N, "next": "...", "previous": "...", "results": [...] }
+    Filter params: search, name, brand_name, min_price, max_price, min_mrp, max_mrp,
+    min_stock, max_stock, in_stock, main_category_id, category_id, sub_category_id,
+    store_id, user_id, is_popular, is_featured, is_active,
+    ordering: -sales_price, sales_price, -avg_rating, avg_rating, name, -created_at, etc.
     """
     serializer_class = product_serializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = ProductFilter
+    pagination_class = ListProductsPagination
     ordering_fields = ["name", "sales_price", "mrp", "stock", "created_at", "is_popular", "is_featured", "avg_rating"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
         user = self.request.user
-        qs = product.objects.filter(is_active=True).annotate(
-            avg_rating=Coalesce(Avg("items__product_reviews__rating"), Value(0), output_field=FloatField())
+        qs = (
+            product.objects.filter(is_active=True, parent__isnull=True)
+            .select_related("user", "main_category", "category", "sub_category")
+            .annotate(
+                avg_rating=Coalesce(Avg("items__product_reviews__rating"), Value(0), output_field=FloatField())
+            )
         )
 
         # Order by nearby: use request.user's location (default address or ?latitude=&longitude=)
