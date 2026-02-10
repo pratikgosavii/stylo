@@ -110,6 +110,46 @@ class VendorStoreListAPIView(mixins.ListModelMixin,
                 ).order_by("_nearby_order", "id")
         return qs
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        user_lat, user_lon = None, None
+        if request.user.is_authenticated:
+            default_address_obj = Address.objects.filter(user=request.user, is_default=True).first()
+            if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+                try:
+                    user_lat = float(default_address_obj.latitude)
+                    user_lon = float(default_address_obj.longitude)
+                except (TypeError, ValueError):
+                    pass
+        req_lat = request.query_params.get("latitude")
+        req_lon = request.query_params.get("longitude")
+        if req_lat is not None and req_lon is not None:
+            try:
+                user_lat = float(req_lat)
+                user_lon = float(req_lon)
+            except (TypeError, ValueError):
+                pass
+        if user_lat is None or user_lon is None:
+            return response
+        data = response.data
+        results = data.get("results", data) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            lat, lon = item.get("latitude"), item.get("longitude")
+            if lat is not None and lon is not None:
+                try:
+                    dist = _haversine_km(user_lat, user_lon, float(lat), float(lon))
+                    item["distance_km"] = dist
+                    item["travel_time_minutes"] = _travel_time_minutes(dist)
+                except (TypeError, ValueError):
+                    item["distance_km"] = None
+                    item["travel_time_minutes"] = None
+            else:
+                item["distance_km"] = None
+                item["travel_time_minutes"] = None
+        return response
+
     def get(self, request, *args, **kwargs):
         if "id" in kwargs:
             return self.retrieve(request, *args, **kwargs)
@@ -332,6 +372,16 @@ class CartViewSet(viewsets.ModelViewSet):
             uid = getattr(item.product, "user_id", None)
             by_store[uid].append(item)
 
+        # User location for distance_km and travel_time_minutes
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=request.user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+
         # Build response: list of { store, items } per store
         stores_payload = []
         for uid in user_ids:
@@ -340,6 +390,14 @@ class CartViewSet(viewsets.ModelViewSet):
                 continue
             store = store_by_user_id.get(uid)
             store_data = VendorStoreSerializer2(store).data if store else {"user_id": uid, "name": "Store", "id": None}
+            if isinstance(store_data, dict) and store and store.latitude is not None and store.longitude is not None and user_lat is not None and user_lon is not None:
+                dist = _haversine_km(user_lat, user_lon, float(store.latitude), float(store.longitude))
+                store_data["distance_km"] = dist
+                store_data["travel_time_minutes"] = _travel_time_minutes(dist)
+            else:
+                if isinstance(store_data, dict):
+                    store_data["distance_km"] = None
+                    store_data["travel_time_minutes"] = None
             items_data = [CartSerializer(it, context={"request": request}).data for it in items]
             stores_payload.append({"store": store_data, "items": items_data})
 
@@ -651,10 +709,18 @@ class FavouriteViewSet(viewsets.ViewSet):
 
 
 def _store_with_products_response(store, request, product_serializer, VendorStoreSerializer):
-    """Build response with full store details and store's products (each product includes full store)."""
+    """Build response with full store details and store's products (each product includes full store). Adds distance_km and travel_time_minutes when user has default address."""
     if not store:
         return None
     store_data = VendorStoreSerializer(store, context={"request": request}).data
+    distance_km = None
+    if request.user.is_authenticated and store.latitude is not None and store.longitude is not None:
+        addr = Address.objects.filter(user=request.user, is_default=True).first()
+        if addr and addr.latitude is not None and addr.longitude is not None:
+            distance_km = _haversine_km(float(addr.latitude), float(addr.longitude), float(store.latitude), float(store.longitude))
+    if isinstance(store_data, dict):
+        store_data["distance_km"] = distance_km
+        store_data["travel_time_minutes"] = _travel_time_minutes(distance_km)
     products_qs = product.objects.filter(user_id=store.user_id, is_active=True, parent__isnull=True).select_related("main_category", "category", "sub_category")[:50]
     products_data = []
     for p in products_qs:
@@ -663,6 +729,8 @@ def _store_with_products_response(store, request, product_serializer, VendorStor
             prod_data["store"] = store_data
             prod_data["store_name"] = store.name
             prod_data["store_id"] = store.id
+            prod_data["distance_km"] = distance_km
+            prod_data["travel_time_minutes"] = store_data.get("travel_time_minutes")
         products_data.append(prod_data)
     return {"store": store_data, "products": products_data}
 
@@ -698,6 +766,14 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
         payload = {"status": "removed"}
         if store:
             payload["store"] = VendorStoreSerializer(store, context={"request": request}).data
+            distance_km = None
+            if request.user.is_authenticated and store.latitude is not None and store.longitude is not None:
+                addr = Address.objects.filter(user=request.user, is_default=True).first()
+                if addr and addr.latitude is not None and addr.longitude is not None:
+                    distance_km = _haversine_km(float(addr.latitude), float(addr.longitude), float(store.latitude), float(store.longitude))
+            if isinstance(payload["store"], dict):
+                payload["store"]["distance_km"] = distance_km
+                payload["store"]["travel_time_minutes"] = _travel_time_minutes(distance_km)
             products_qs = product.objects.filter(user_id=store.user_id, is_active=True, parent__isnull=True).select_related("main_category", "category", "sub_category")[:50]
             products_data = []
             for p in products_qs:
@@ -706,6 +782,8 @@ class FavouriteStoreViewSet(viewsets.ViewSet):
                     prod_data["store"] = payload["store"]
                     prod_data["store_name"] = store.name
                     prod_data["store_id"] = store.id
+                    prod_data["distance_km"] = distance_km
+                    prod_data["travel_time_minutes"] = payload["store"].get("travel_time_minutes")
                 products_data.append(prod_data)
             payload["products"] = products_data
         return Response(payload, status=status.HTTP_200_OK)
@@ -732,10 +810,33 @@ class LikedProductsAndStoresAPIView(APIView):
         products = [fav.product for fav in product_favs]
         liked_products = product_serializer(products, many=True, context={"request": request}).data
 
-        # Liked stores
+        # Liked stores (with distance_km and travel_time_minutes when user has default address)
         store_favs = FavouriteStore.objects.filter(user=user).select_related("store")
         stores = [fav.store for fav in store_favs]
         liked_stores = VendorStoreSerializer(stores, many=True, context={"request": request}).data
+        user_lat, user_lon = None, None
+        default_address_obj = Address.objects.filter(user=user, is_default=True).first()
+        if default_address_obj and default_address_obj.latitude is not None and default_address_obj.longitude is not None:
+            try:
+                user_lat = float(default_address_obj.latitude)
+                user_lon = float(default_address_obj.longitude)
+            except (TypeError, ValueError):
+                pass
+        for item in liked_stores:
+            if not isinstance(item, dict):
+                continue
+            lat, lon = item.get("latitude"), item.get("longitude")
+            if user_lat is not None and user_lon is not None and lat is not None and lon is not None:
+                try:
+                    dist = _haversine_km(user_lat, user_lon, float(lat), float(lon))
+                    item["distance_km"] = dist
+                    item["travel_time_minutes"] = _travel_time_minutes(dist)
+                except (TypeError, ValueError):
+                    item["distance_km"] = None
+                    item["travel_time_minutes"] = None
+            else:
+                item["distance_km"] = None
+                item["travel_time_minutes"] = None
 
         return Response({
             "liked_products": liked_products,
@@ -800,6 +901,10 @@ class NeedProductsAPIView(APIView):
                             data["distance_km"] = None
                     else:
                         data["distance_km"] = None
+                    data["travel_time_minutes"] = _travel_time_minutes(data.get("distance_km"))
+                    if data.get("store") and isinstance(data["store"], dict):
+                        data["store"]["distance_km"] = data.get("distance_km")
+                        data["store"]["travel_time_minutes"] = data["travel_time_minutes"]
                 out.append(data)
             return out
 
@@ -1164,6 +1269,7 @@ class SellersNearYouAPIView(APIView):
                 store_data = VendorStoreSerializer(s, context={"request": request}).data
                 if isinstance(store_data, dict):
                     store_data["distance_km"] = dist
+                    store_data["travel_time_minutes"] = _travel_time_minutes(dist)
                 results.append(store_data)
         results.sort(key=lambda x: x.get("distance_km", 999999))
 
@@ -1190,6 +1296,18 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R * c, 2)
+
+
+def _travel_time_minutes(distance_km):
+    """Estimated travel time in minutes: time to travel distance_km at ~25 km/h + 10 min extra. Returns None if distance_km is None."""
+    if distance_km is None:
+        return None
+    try:
+        # ~25 km/h average urban; (distance_km / 25) * 60 minutes + 10 min buffer
+        travel_min = round((float(distance_km) / 25) * 60) + 10
+        return max(10, travel_min)  # at least 10 min
+    except (TypeError, ValueError):
+        return None
 
 
 class CustomerHomeScreenAPIView(APIView):
@@ -1258,6 +1376,7 @@ class CustomerHomeScreenAPIView(APIView):
                     "latitude": str(s.latitude),
                     "longitude": str(s.longitude),
                     "distance_km": dist,
+                    "travel_time_minutes": _travel_time_minutes(dist),
                 }
                 stores_nearby.append(item)
         stores_nearby.sort(key=lambda x: x["distance_km"])
@@ -1336,6 +1455,7 @@ class CustomerHomeScreenAPIView(APIView):
                 prod_data["store"] = VendorStoreSerializer(store, context={"request": request}).data if store else None
                 if prod_data.get("store") and isinstance(prod_data["store"], dict):
                     prod_data["store"]["distance_km"] = distance_km
+                    prod_data["store"]["travel_time_minutes"] = _travel_time_minutes(distance_km)
             return prod_data
 
         # Random products: 10 random from stores within 10km
@@ -1469,6 +1589,7 @@ class StoreNearMeAPIView(APIView):
                 store_data = VendorStoreSerializer(s, context={"request": request}).data
                 if isinstance(store_data, dict):
                     store_data["distance_km"] = dist
+                    store_data["travel_time_minutes"] = _travel_time_minutes(dist)
                 results.append(store_data)
         results.sort(key=lambda x: x.get("distance_km", 999999))
 
@@ -1523,6 +1644,7 @@ class TopPicksAPIView(APIView):
                 prod_data["store_id"] = store.id if store else None
                 prod_data["distance_km"] = distance_km
                 prod_data["discount_percent"] = discount_percent
+                prod_data["travel_time_minutes"] = _travel_time_minutes(distance_km)
             top_picks.append(prod_data)
 
         return Response({"top_picks": top_picks}, status=status.HTTP_200_OK)
@@ -1578,6 +1700,7 @@ class SpotlightProductsAPIView(APIView):
                 prod_data["store_id"] = store.id if store else None
                 prod_data["distance_km"] = distance_km
                 prod_data["discount_percent"] = discount_percent
+                prod_data["travel_time_minutes"] = _travel_time_minutes(distance_km)
                 prod_data["discount_tag"] = sp.discount_tag
                 prod_data["spotlight_id"] = sp.id
             results.append(prod_data)
@@ -1826,6 +1949,7 @@ class HomeScreenView(APIView):
                     'latitude': str(s.latitude) if s.latitude else None,
                     'longitude': str(s.longitude) if s.longitude else None,
                     'distance_km': distance_km,
+                    'travel_time_minutes': _travel_time_minutes(distance_km),
                     'banners': store_banners_data
                 })
 
@@ -1850,6 +1974,7 @@ class HomeScreenView(APIView):
                     products_serialized[i]["store_id"] = store.id if store else None
                     products_serialized[i]["distance_km"] = distance_km
                     products_serialized[i]["discount_percent"] = discount_percent
+                    products_serialized[i]["travel_time_minutes"] = _travel_time_minutes(distance_km)
 
             # -------------------------
             # build response payload for this main category
