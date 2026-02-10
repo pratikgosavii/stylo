@@ -1423,12 +1423,12 @@ class CustomerHomeScreenAPIView(APIView):
                 banners_qs = banners_qs.filter(main_category_id=int(main_category_id))
             except (TypeError, ValueError):
                 pass
-        banners_qs = banners_qs.select_related("user").order_by("-created_at")[:self.SECTION_LIMIT]
+        banners_qs = banners_qs.select_related("user", "product").order_by("-created_at")[:self.SECTION_LIMIT]
         banners = []
         for b in banners_qs:
             store = getattr(b.user, "vendor_store", None)
             store_obj = store.first() if store else None
-            banners.append({
+            banner_data = {
                 "id": b.id,
                 "title": b.campaign_name or "",
                 "description": "",
@@ -1437,7 +1437,12 @@ class CustomerHomeScreenAPIView(APIView):
                 "store_name": store_obj.name if store_obj else None,
                 "product_id": b.product_id if b.product_id else None,
                 "main_category_id": b.main_category_id,
-            })
+            }
+            if b.product_id and b.product:
+                banner_data["product"] = product_serializer(b.product, context={"request": request}).data
+            else:
+                banner_data["product"] = None
+            banners.append(banner_data)
 
         def _enrich_product(prod, store):
             distance_km = None
