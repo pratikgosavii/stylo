@@ -1889,18 +1889,29 @@ class HomeScreenView(APIView):
             product_ids = [p.id for p in products]
 
             # -------------------------
-            # Fetch reviews for all products in batch — single query, key by product_id
+            # Fetch reviews for all products in batch — single query, key by product_id; and total count per product
             # -------------------------
             reviews_map = {}
+            review_count_map = {}
+            avg_rating_map = {}
             if product_ids:
+                from django.db.models import Count, Avg
+                agg = Review.objects.filter(order_item__product_id__in=product_ids).values(
+                    'order_item__product_id'
+                ).annotate(count=Count('id'), avg=Avg('rating'))
+                review_count_map = {row['order_item__product_id']: row['count'] for row in agg}
+                avg_rating_map = {
+                    row['order_item__product_id']: round(float(row['avg'] or 0), 1)
+                    for row in agg
+                }
                 reviews_qs = Review.objects.filter(
                     order_item__product_id__in=product_ids
-                ).select_related('order_item', 'user')
+                ).select_related('order_item', 'user').order_by('order_item__product_id', '-created_at')
                 for rev in reviews_qs:
                     prod_id = rev.order_item.product_id
-                    reviews_map.setdefault(prod_id, []).append(
-                        ReviewSerializer(rev, context={'request': request}).data
-                    )
+                    lst = reviews_map.setdefault(prod_id, [])
+                    if len(lst) < 4:  # top 4 per product
+                        lst.append(ReviewSerializer(rev, context={'request': request}).data)
 
             # -------------------------
             # Stores: determine user_ids from products we fetched (fast)
@@ -1951,9 +1962,14 @@ class HomeScreenView(APIView):
                 })
 
             # -------------------------
-            # Serialize products using product_serializer but pass reviews_map in context
+            # Serialize products using product_serializer; pass reviews_map and review_count_map in context
             # -------------------------
-            ser_context = {'request': request, 'reviews_map': reviews_map}
+            ser_context = {
+                'request': request,
+                'reviews_map': reviews_map,
+                'review_count_map': review_count_map,
+                'avg_rating_map': avg_rating_map,
+            }
             products_serialized = product_serializer(products, many=True, context=ser_context).data
 
             # Enrich each product with store_name, store_id, distance_km, discount_percent (for UI)

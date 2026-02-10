@@ -39,8 +39,9 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     color_details = color_serializer(source='color', read_only=True)
     gallery_images = serializers.SerializerMethodField()
 
-    avg_rating = serializers.SerializerMethodField()    
+    avg_rating = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
+    total_review_count = serializers.SerializerMethodField()
 
     is_favourite = serializers.SerializerMethodField()  # ✅ dynamic now
 
@@ -53,14 +54,17 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         return ProductGalleryImageSerializer(qs, many=True, context=self.context).data
 
     def _get_reviews_queryset(self, obj):
-        """ Reuse same queryset to avoid double DB hit """
+        """Reuse same queryset to avoid double DB hit."""
         if not hasattr(self, '_cached_reviews'):
-            self._cached_reviews = Review.objects.filter(order_item__product=obj)
-        return self._cached_reviews
+            self._cached_reviews = {}
+        if obj.id not in self._cached_reviews:
+            self._cached_reviews[obj.id] = Review.objects.filter(order_item__product=obj)
+        return self._cached_reviews[obj.id]
 
     def get_reviews(self, obj):
+        """Return top 4 reviews (latest by created_at)."""
         from customer.serializers import ReviewSerializer
-        reviews = self._get_reviews_queryset(obj)
+        reviews = self._get_reviews_queryset(obj).order_by('-created_at')[:4]
         return ReviewSerializer(reviews, many=True).data
 
     def get_avg_rating(self, obj):
@@ -68,7 +72,9 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         reviews = self._get_reviews_queryset(obj)
         avg = reviews.aggregate(avg=Avg('rating'))['avg']
         return round(avg, 1) if avg else 0.0
-    
+
+    def get_total_review_count(self, obj):
+        return self._get_reviews_queryset(obj).count()
 
     def get_is_favourite(self, obj):
         from customer.models import Favourite
@@ -107,9 +113,10 @@ class product_serializer(serializers.ModelSerializer):
     variants = serializers.SerializerMethodField()
     store = serializers.SerializerMethodField()
 
-    # Add reviews as nested read-only field
-    avg_rating = serializers.SerializerMethodField()    
+    # Add reviews as nested read-only field (top 4), avg_rating, total_review_count
+    avg_rating = serializers.SerializerMethodField()
     reviews = serializers.SerializerMethodField()
+    total_review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = product
@@ -152,16 +159,24 @@ class product_serializer(serializers.ModelSerializer):
         return self._reviews_cache[obj.id]
 
     def get_reviews(self, obj):
-        # Use pre-fetched reviews_map from context when present (avoids N+1 in list views)
+        # Use pre-fetched reviews_map from context when present (avoids N+1 in list views). Return top 4 (latest).
         reviews_map = self.context.get('reviews_map')
         if reviews_map is not None:
-            return reviews_map.get(obj.id, [])
+            revs = reviews_map.get(obj.id, [])
+            # Sort by created_at descending if present, then take top 4
+            if revs and isinstance(revs[0], dict) and 'created_at' in revs[0]:
+                revs = sorted(revs, key=lambda r: r.get('created_at') or '', reverse=True)
+            return revs[:4]
         from customer.serializers import ReviewSerializer
-        reviews = self._get_reviews_queryset(obj)
+        reviews = self._get_reviews_queryset(obj).order_by('-created_at')[:4]
         return ReviewSerializer(reviews, many=True).data
 
     def get_avg_rating(self, obj):
-        # Use pre-fetched reviews_map when present to avoid extra query
+        # Use pre-fetched avg_rating_map when present (true overall average)
+        avg_rating_map = self.context.get('avg_rating_map')
+        if avg_rating_map is not None:
+            return avg_rating_map.get(obj.id, 0.0)
+        # Fallback: use reviews_map (avg of the 4 we have) or DB
         reviews_map = self.context.get('reviews_map')
         if reviews_map is not None:
             revs = reviews_map.get(obj.id, [])
@@ -173,6 +188,13 @@ class product_serializer(serializers.ModelSerializer):
         reviews = self._get_reviews_queryset(obj)
         avg = reviews.aggregate(avg=Avg('rating'))['avg']
         return round(avg, 1) if avg else 0.0
+
+    def get_total_review_count(self, obj):
+        # Use review_count_map from context when present (e.g. HomeScreenView)
+        review_count_map = self.context.get('review_count_map')
+        if review_count_map is not None:
+            return review_count_map.get(obj.id, 0)
+        return self._get_reviews_queryset(obj).count()
 
     def get_store(self, obj):
         try:
