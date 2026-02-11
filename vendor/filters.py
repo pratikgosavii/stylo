@@ -78,14 +78,14 @@ class ProductFilter(django_filters.FilterSet):
     store_id = django_filters.NumberFilter(method="filter_store_id", label="Store ID (products from this store)")
     user_id = django_filters.NumberFilter(field_name="user_id")
 
-    # Foreign keys
+    # Foreign keys (accept single or comma-separated: size_id=1,2,3)
     category = django_filters.ModelChoiceFilter(queryset=product_category.objects.all())
     sub_category = django_filters.ModelChoiceFilter(queryset=product_subcategory.objects.all())
-    size_id = django_filters.NumberFilter(field_name="size_id")
-    color_id = django_filters.NumberFilter(field_name="color_id")
+    size_id = django_filters.CharFilter(method="filter_size_ids")
+    color_id = django_filters.CharFilter(method="filter_color_ids")
 
-    # Choice fields
-    fabric_type = django_filters.ChoiceFilter(choices=product.FABRIC_TYPE_CHOICES)
+    # Choice fields (accept single or comma-separated: fabric_type=cotton,polyester)
+    fabric_type = django_filters.CharFilter(method="filter_fabric_types")
 
     # Boolean fields
     tax_inclusive = django_filters.BooleanFilter()
@@ -134,6 +134,28 @@ class ProductFilter(django_filters.FilterSet):
         ids = self._parse_id_list(value)
         if ids:
             return queryset.filter(sub_category_id__in=ids)
+        return queryset
+
+    def filter_size_ids(self, queryset, name, value):
+        ids = self._parse_id_list(value)
+        if ids:
+            return queryset.filter(size_id__in=ids)
+        return queryset
+
+    def filter_color_ids(self, queryset, name, value):
+        ids = self._parse_id_list(value)
+        if ids:
+            return queryset.filter(color_id__in=ids)
+        return queryset
+
+    def filter_fabric_types(self, queryset, name, value):
+        if not value:
+            return queryset
+        types = [v.strip().lower() for v in str(value).split(",") if v.strip()]
+        valid = {c[0] for c in product.FABRIC_TYPE_CHOICES}
+        filtered = [t for t in types if t in valid]
+        if filtered:
+            return queryset.filter(fabric_type__in=filtered)
         return queryset
 
     def filter_store_id(self, queryset, name, value):

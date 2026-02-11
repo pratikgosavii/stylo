@@ -1,5 +1,5 @@
 from django.forms import ValidationError
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 # Create your views here.
 
@@ -214,8 +214,8 @@ class ListProducts(ListAPIView):
     Response: { "count": N, "next": "...", "previous": "...", "results": [...] }
     Filter params: search, name, brand_name, min_price, max_price, min_mrp, max_mrp,
     min_stock, max_stock, in_stock, main_category_id, category_id, sub_category_id
-    (main_category_id, category_id, sub_category_id accept comma-separated: e.g. category_id=1,2,3),
-    store_id, user_id, is_popular, is_featured, is_active,
+    (main_category_id, category_id, sub_category_id, size_id, color_id accept comma-separated),
+    fabric_type (comma-separated: cotton,polyester,silk), store_id, user_id, is_popular, is_featured, is_active,
     ordering: -sales_price, sales_price, -avg_rating, avg_rating, name, -created_at, etc.
     """
     serializer_class = product_serializer
@@ -1344,7 +1344,7 @@ class CustomerHomeScreenAPIView(APIView):
     Single API for customer home screen UI:
     - Stores nearby: only within 10km of user location
     - All product/banner/offer data from stores within 10km
-    - Sections (10 each): banners, random_products, favourite_products, top_picks, offers, featured_products
+    - Sections (10 each): banners, random_products, favourite_products, top_picks, offers (banners), store_offers (StoreOffer), featured_products
 
     Query params:
     - latitude, longitude (optional; if omitted, uses user's default address for distance)
@@ -1535,7 +1535,7 @@ class CustomerHomeScreenAPIView(APIView):
             )
         featured_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_featured]
 
-        # Offers: store banners (same source as banners; filtered by main_category_id when provided)
+        # Offers: banner campaigns (same source as banners; filtered by main_category_id when provided)
         offers = []
         for b in banners_qs:
             store_rel = getattr(b.user, "vendor_store", None)
@@ -1550,6 +1550,37 @@ class CustomerHomeScreenAPIView(APIView):
                 "main_category_id": b.main_category_id,
             })
 
+        # Store offers: StoreOffer (promotional - discount %, free delivery) from stores within 10km
+        from django.utils import timezone as tz
+        from vendor.models import StoreOffer
+        today = tz.now().date()
+        store_offers_qs = StoreOffer.objects.filter(
+            user_id__in=vendor_user_ids,
+            is_active=True,
+        ).filter(
+            Q(valid_from__isnull=True) | Q(valid_from__lte=today)
+        ).filter(
+            Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+        ).prefetch_related("applicable_products", "applicable_categories").order_by("-created_at")
+        if main_category_id:
+            try:
+                store_offers_qs = store_offers_qs.filter(applicable_categories__main_category_id=int(main_category_id)).distinct()
+            except (TypeError, ValueError):
+                pass
+        store_offers_qs = store_offers_qs[:self.SECTION_LIMIT]
+        store_offers = StoreOfferSerializer(store_offers_qs, many=True, context={"request": request}).data
+        for o in store_offers:
+            uid = o.get("user")
+            store_obj = store_by_user_id.get(uid) if uid else None
+            o["store"] = store_obj.id if store_obj else None
+            o["store_name"] = store_obj.name if store_obj else None
+            o["distance_km"] = None
+            o["travel_time_minutes"] = None
+            if user_lat is not None and user_lon is not None and store_obj and store_obj.latitude and store_obj.longitude:
+                dist = _haversine_km(user_lat, user_lon, float(store_obj.latitude), float(store_obj.longitude))
+                o["distance_km"] = dist
+                o["travel_time_minutes"] = _travel_time_minutes(dist)
+
         payload = {
             "user_greeting": user_greeting,
             "delivery_address": default_address,
@@ -1561,6 +1592,7 @@ class CustomerHomeScreenAPIView(APIView):
             "favourite_products": favourite_products,
             "top_picks": top_picks,
             "offers": offers,
+            "store_offers": store_offers,
             "featured_products": featured_products,
         }
         return Response(payload, status=status.HTTP_200_OK)
@@ -2137,6 +2169,41 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
 
         serializer.save(user=user)
 
+
+class ProductReviewsAPIView(APIView):
+    """
+    GET /customer/products/<product_id>/reviews/
+    Retrieve all reviews for a product. Query params: limit (default 10), offset (default 0).
+    Returns visible reviews only (is_visible=True). Includes reviews for product and its variants.
+    Response: { "count": N, "next": "...", "previous": "...", "results": [...], "avg_rating": float }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, product_id):
+        from .serializers import ReviewSerializer
+        get_object_or_404(product, id=product_id, is_active=True)
+        limit = int(request.query_params.get("limit", 10))
+        offset = int(request.query_params.get("offset", 0))
+        limit = min(max(limit, 1), 50)
+        offset = max(offset, 0)
+        qs = Review.objects.filter(
+            Q(order_item__product_id=product_id) | Q(order_item__product__parent_id=product_id),
+            is_visible=True,
+        ).select_related("user", "order_item", "order_item__product").order_by("-created_at")
+        total = qs.count()
+        reviews = qs[offset : offset + limit]
+        avg = qs.aggregate(avg=Avg("rating"))["avg"] or 0
+        data = ReviewSerializer(reviews, many=True, context={"request": request}).data
+        base_url = request.build_absolute_uri(request.path)
+        next_url = f"{base_url}?limit={limit}&offset={offset + limit}" if offset + limit < total else None
+        prev_url = f"{base_url}?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None
+        return Response({
+            "count": total,
+            "next": next_url,
+            "previous": prev_url,
+            "results": data,
+            "avg_rating": round(float(avg), 2),
+        })
 
 
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
