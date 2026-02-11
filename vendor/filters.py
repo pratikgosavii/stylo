@@ -71,10 +71,10 @@ class ProductFilter(django_filters.FilterSet):
     expiry_before = django_filters.DateFilter(field_name="expiry_date", lookup_expr="lte")
     expiry_after = django_filters.DateFilter(field_name="expiry_date", lookup_expr="gte")
 
-    # Category / store filters
-    main_category_id = django_filters.NumberFilter(field_name="category__main_category_id")
-    category_id = django_filters.NumberFilter(field_name="category_id")
-    sub_category_id = django_filters.NumberFilter(field_name="sub_category_id")
+    # Category / store filters (accept single or comma-separated: category_id=1,2,3)
+    main_category_id = django_filters.CharFilter(method="filter_main_category_ids")
+    category_id = django_filters.CharFilter(method="filter_category_ids")
+    sub_category_id = django_filters.CharFilter(method="filter_sub_category_ids")
     store_id = django_filters.NumberFilter(method="filter_store_id", label="Store ID (products from this store)")
     user_id = django_filters.NumberFilter(field_name="user_id")
 
@@ -100,6 +100,40 @@ class ProductFilter(django_filters.FilterSet):
                 | Q(brand_name__icontains=value)
                 | Q(description__icontains=value)
             )
+        return queryset
+
+    def _parse_id_list(self, value):
+        """Parse comma-separated IDs into list of ints."""
+        if not value:
+            return []
+        ids = []
+        for v in str(value).split(","):
+            v = v.strip()
+            if v:
+                try:
+                    ids.append(int(v))
+                except ValueError:
+                    pass
+        return ids
+
+    def filter_main_category_ids(self, queryset, name, value):
+        ids = self._parse_id_list(value)
+        if ids:
+            return queryset.filter(
+                Q(main_category_id__in=ids) | Q(category__main_category_id__in=ids)
+            )
+        return queryset
+
+    def filter_category_ids(self, queryset, name, value):
+        ids = self._parse_id_list(value)
+        if ids:
+            return queryset.filter(category_id__in=ids)
+        return queryset
+
+    def filter_sub_category_ids(self, queryset, name, value):
+        ids = self._parse_id_list(value)
+        if ids:
+            return queryset.filter(sub_category_id__in=ids)
         return queryset
 
     def filter_store_id(self, queryset, name, value):

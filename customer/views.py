@@ -213,7 +213,8 @@ class ListProducts(ListAPIView):
     Lazy loading: 10 products per request. Query params: limit (default 10), offset (default 0).
     Response: { "count": N, "next": "...", "previous": "...", "results": [...] }
     Filter params: search, name, brand_name, min_price, max_price, min_mrp, max_mrp,
-    min_stock, max_stock, in_stock, main_category_id, category_id, sub_category_id,
+    min_stock, max_stock, in_stock, main_category_id, category_id, sub_category_id
+    (main_category_id, category_id, sub_category_id accept comma-separated: e.g. category_id=1,2,3),
     store_id, user_id, is_popular, is_featured, is_active,
     ordering: -sales_price, sales_price, -avg_rating, avg_rating, name, -created_at, etc.
     """
