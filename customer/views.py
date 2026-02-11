@@ -2170,40 +2170,38 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
         serializer.save(user=user)
 
 
-class ProductReviewsAPIView(APIView):
+class ProductReviewsPagination(LimitOffsetPagination):
+    """Lazy loading: 10 reviews per request. Use ?limit=10&offset=0, then offset=10, 20, ..."""
+    default_limit = 10
+    max_limit = 50
+    limit_query_param = "limit"
+    offset_query_param = "offset"
+
+
+class ProductReviewsAPIView(ListAPIView):
     """
     GET /customer/products/<product_id>/reviews/
-    Retrieve all reviews for a product. Query params: limit (default 10), offset (default 0).
-    Returns visible reviews only (is_visible=True). Includes reviews for product and its variants.
+    Retrieve all reviews for a product. Lazy loading: limit (default 10), offset (default 0).
     Response: { "count": N, "next": "...", "previous": "...", "results": [...], "avg_rating": float }
     """
+    serializer_class = ReviewSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = ProductReviewsPagination
 
-    def get(self, request, product_id):
-        from .serializers import ReviewSerializer
+    def get_queryset(self):
+        product_id = self.kwargs["product_id"]
         get_object_or_404(product, id=product_id, is_active=True)
-        limit = int(request.query_params.get("limit", 10))
-        offset = int(request.query_params.get("offset", 0))
-        limit = min(max(limit, 1), 50)
-        offset = max(offset, 0)
-        qs = Review.objects.filter(
+        return Review.objects.filter(
             Q(order_item__product_id=product_id) | Q(order_item__product__parent_id=product_id),
             is_visible=True,
         ).select_related("user", "order_item", "order_item__product").order_by("-created_at")
-        total = qs.count()
-        reviews = qs[offset : offset + limit]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        qs = self.get_queryset()
         avg = qs.aggregate(avg=Avg("rating"))["avg"] or 0
-        data = ReviewSerializer(reviews, many=True, context={"request": request}).data
-        base_url = request.build_absolute_uri(request.path)
-        next_url = f"{base_url}?limit={limit}&offset={offset + limit}" if offset + limit < total else None
-        prev_url = f"{base_url}?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None
-        return Response({
-            "count": total,
-            "next": next_url,
-            "previous": prev_url,
-            "results": data,
-            "avg_rating": round(float(avg), 2),
-        })
+        response.data["avg_rating"] = round(float(avg), 2)
+        return response
 
 
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
