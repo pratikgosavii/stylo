@@ -67,6 +67,34 @@ class VendorStoreListAPIView(mixins.ListModelMixin,
 
     def get_queryset(self):
         qs = vendor_store.objects.filter(is_active=True)
+        # Filter by category, main_category, subcategory
+        main_category_id = self.request.query_params.get("main_category_id") or self.request.query_params.get("main_category")
+        category_id = self.request.query_params.get("category_id") or self.request.query_params.get("category")
+        subcategory_id = self.request.query_params.get("subcategory_id") or self.request.query_params.get("subcategory")
+        if main_category_id:
+            try:
+                qs = qs.filter(
+                    user__productssdsdsd__main_category_id=int(main_category_id),
+                    user__productssdsdsd__is_active=True,
+                ).distinct()
+            except (TypeError, ValueError):
+                pass
+        if category_id:
+            try:
+                qs = qs.filter(
+                    user__productssdsdsd__category_id=int(category_id),
+                    user__productssdsdsd__is_active=True,
+                ).distinct()
+            except (TypeError, ValueError):
+                pass
+        if subcategory_id:
+            try:
+                qs = qs.filter(
+                    user__productssdsdsd__sub_category_id=int(subcategory_id),
+                    user__productssdsdsd__is_active=True,
+                ).distinct()
+            except (TypeError, ValueError):
+                pass
         # Sort by distance (nearby) when user location is available
         user = self.request.user
         user_lat, user_lon = None, None
