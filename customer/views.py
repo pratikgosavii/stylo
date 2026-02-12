@@ -2149,7 +2149,7 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Only this customer's reviews
-        return Review.objects.filter(user=self.request.user).select_related("order_item", "order_item__order", "order_item__product").order_by("-created_at")
+        return Review.objects.filter(user=self.request.user).select_related("order_item", "order_item__order", "order_item__product").prefetch_related("photos").order_by("-created_at")
 
     def perform_create(self, serializer):
         order_item = serializer.validated_data['order_item']
@@ -2167,7 +2167,16 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
         if getattr(order_item.order, "status", None) != "completed":
             raise ValidationError("You can only review after delivery.")
 
-        serializer.save(user=user)
+        review = serializer.save(user=user)
+
+        # Handle multiple photos: photos (multiple) or photo (single legacy)
+        from customer.models import ReviewPhoto
+        photo_files = list(self.request.FILES.getlist('photos') or [])
+        if not photo_files and self.request.FILES.get('photo'):
+            photo_files = [self.request.FILES.get('photo')]
+        for i, img in enumerate(photo_files):
+            if img and hasattr(img, 'read'):
+                ReviewPhoto.objects.create(review=review, image=img, order=i)
 
 
 class ProductReviewsPagination(LimitOffsetPagination):
@@ -2194,7 +2203,7 @@ class ProductReviewsAPIView(ListAPIView):
         return Review.objects.filter(
             Q(order_item__product_id=product_id) | Q(order_item__product__parent_id=product_id),
             is_visible=True,
-        ).select_related("user", "order_item", "order_item__product").order_by("-created_at")
+        ).select_related("user", "order_item", "order_item__product").prefetch_related("photos").order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)

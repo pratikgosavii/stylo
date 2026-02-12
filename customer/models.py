@@ -347,7 +347,7 @@ class Review(models.Model):
     comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    photo = models.ImageField(upload_to="review/photos/", blank=True, null=True)
+    photo = models.ImageField(upload_to="review/photos/", blank=True, null=True)  # legacy single photo
     is_visible = models.BooleanField(default=False)
 
     class Meta:
@@ -356,6 +356,16 @@ class Review(models.Model):
 
     def __str__(self):
         return f"{self.user}"
+
+
+class ReviewPhoto(models.Model):
+    """Multiple photos per review."""
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to="review/photos/")
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
 
 
 

@@ -251,12 +251,24 @@ class SupportTicketSerializer(serializers.ModelSerializer):
 
 class ReviewSerializer(serializers.ModelSerializer):
 
-    user_details = UserProfileSerializer(source = 'user', read_only = True)
+    user_details = UserProfileSerializer(source='user', read_only=True)
+    photos = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Review
-        fields = ['id', 'order_item', 'photo', 'is_visible', 'rating', 'comment', 'user_details', 'created_at', 'updated_at']
-        read_only_fields = [ "user"]
+        fields = ['id', 'order_item', 'photo', 'photos', 'is_visible', 'rating', 'comment', 'user_details', 'created_at', 'updated_at']
+        read_only_fields = ["user"]
+
+    def get_photos(self, obj):
+        """Return list of photo URLs (from ReviewPhoto + legacy photo)."""
+        request = self.context.get('request')
+        urls = []
+        for rp in obj.photos.all().order_by('order', 'id'):
+            if rp.image:
+                urls.append(request.build_absolute_uri(rp.image.url) if request else rp.image.url)
+        if not urls and obj.photo:
+            urls.append(request.build_absolute_uri(obj.photo.url) if request else obj.photo.url)
+        return urls
 
 from vendor.models import vendor_store
 
