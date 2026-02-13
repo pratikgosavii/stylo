@@ -2406,6 +2406,8 @@ import datetime as dt
 import hmac
 import hashlib
 import json
+import base64
+import requests
 from django.utils import timezone
 
 
@@ -2514,6 +2516,7 @@ class SelectTrialItemsAPIView(APIView):
     POST /customer/orders/<order_id>/select-trial-items/
     Body: { 
         "selected_item_ids": [1, 2, 3],
+        "payment_method": "online" | "cod" (optional, default "cod"),
         "cancellation_reasons": {
             "size_doesnt_fit": true/false,
             "color_looks_different": true/false,
@@ -2528,6 +2531,9 @@ class SelectTrialItemsAPIView(APIView):
     - Selected items → status becomes 'ordered'
     - Unselected items → status becomes 'cancelled' and stock is restored
     - Order status → 'completed'
+    
+    If payment_method="online" and items are selected, creates Cashfree order and returns
+    payment_session_id for checkout. Use Cashfree Checkout UI with that session_id.
     
     If NO items are selected (all cancelled), cancellation_reasons is REQUIRED.
     
@@ -2679,12 +2685,21 @@ class SelectTrialItemsAPIView(APIView):
         order.total_amount = new_total_amount
         order.save(update_fields=["item_total", "total_amount"])
 
+        # Payment: create Cashfree order if payment_method is "online" and items selected
+        payment_method = (request.data.get("payment_method") or "cod").strip().lower()
+        payment_data = None
+        if payment_method == "online" and ordered_items:
+            payment_data = self._create_cashfree_order(request, order, ordered_items)
+
         # Build response
         response_data = {
             "detail": "Items selected successfully. Order completed." if ordered_items else "All items cancelled.",
             "ordered_item_ids": ordered_items,
             "cancelled_item_ids": cancelled_items,
         }
+        if payment_data:
+            response_data["payment"] = payment_data
+            response_data["payment_method"] = "online"
         
         # Include cancellation reasons in response if any items were cancelled
         if cancelled_items and cancellation_reasons:
@@ -2702,6 +2717,82 @@ class SelectTrialItemsAPIView(APIView):
         response_data["order"] = OrderSerializer(order, context={"request": request}).data
         
         return Response(response_data, status=status.HTTP_200_OK)
+
+    def _create_cashfree_order(self, request, order, ordered_item_ids):
+        """Create Cashfree order for online payment. Returns payment data or None on error."""
+        app_id = getattr(settings, "CASHFREE_APP_ID", None)
+        secret_key = getattr(settings, "CASHFREE_SECRET_KEY", None)
+        if not app_id or not secret_key:
+            return {"error": "Cashfree not configured. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY."}
+
+        base_url = getattr(settings, "CASHFREE_BASE_URL", "https://sandbox.cashfree.com/pg")
+        if not base_url.endswith("/pg"):
+            base_url = base_url.rstrip("/") + "/pg"
+
+        total_payable = float(order.total_amount)
+        if total_payable < 1:
+            return {"error": "Order amount too low for payment."}
+
+        cf_order_id = f"order_{order.id}_{int(dt.datetime.now().timestamp())}"[:45]
+        ids_str = ",".join(str(i) for i in ordered_item_ids)
+
+        customer_phone = getattr(request.user, "phone", None) or getattr(request.user, "mobile_number", None) or ""
+        customer_email = getattr(request.user, "email", None) or f"user{request.user.id}@stylo.com"
+
+        payload = {
+            "order_id": cf_order_id,
+            "order_amount": total_payable,
+            "order_currency": "INR",
+            "order_note": f"Order {order.order_id} - Items: {ids_str}",
+            "customer_details": {
+                "customer_id": str(request.user.id),
+                "customer_phone": str(customer_phone)[:10] if customer_phone else "9999999999",
+                "customer_email": customer_email[:100],
+            },
+            "order_tags": {
+                "app_order_id": str(order.id),
+                "paid_item_ids": ids_str,
+                "user_id": str(request.user.id),
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-version": "2023-08-01",
+            "x-client-id": app_id,
+            "x-client-secret": secret_key,
+        }
+
+        try:
+            resp = requests.post(f"{base_url}/orders", json=payload, headers=headers, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as e:
+            err_detail = str(e)
+            if hasattr(e, "response") and e.response is not None:
+                try:
+                    err_body = e.response.json()
+                    err_detail = err_body.get("message", err_body.get("error", err_detail))
+                except Exception:
+                    pass
+            return {"error": "Failed to create Cashfree order", "detail": err_detail}
+        except Exception as e:
+            return {"error": "Failed to create Cashfree order", "detail": str(e)}
+
+        order.payment_gateway = "cashfree"
+        order.pg_order_id = data.get("cf_order_id") or cf_order_id
+        order.payment_status = "pending"
+        order.payment_mode = "ONLINE"
+        order.save(update_fields=["payment_gateway", "pg_order_id", "payment_status", "payment_mode"])
+
+        return {
+            "payment_session_id": data.get("payment_session_id"),
+            "cf_order_id": data.get("cf_order_id"),
+            "order_id": data.get("order_id") or cf_order_id,
+            "order_amount": data.get("order_amount"),
+            "order_currency": data.get("order_currency", "INR"),
+            "app_id": app_id,
+        }
 
 
 class CancelOrderByCustomerAPIView(APIView):
@@ -3008,5 +3099,198 @@ class RazorpayWebhookAPIView(APIView):
         # Reflect order state (accepted/in_transit/delivered live on Order only; OrderItem unchanged)
         order.status = "accepted"
         order.save(update_fields=["status"])
+
+        return Response({"status": "ok"}, status=200)
+
+
+class CreateCashfreeOrderAPIView(APIView):
+    """
+    Create a Cashfree order for selected order items.
+    Body: { "order_item_ids": [1,2,3], "coupon": "CODE" (optional) }
+    Returns payment_session_id for Cashfree Checkout UI.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_item_ids = request.data.get("order_item_ids") or []
+        if not isinstance(order_item_ids, list) or not order_item_ids:
+            return Response({"error": "order_item_ids must be a non-empty list"}, status=400)
+        coupon_code = (request.data.get("coupon") or "").strip()
+
+        # Reuse summary computation
+        summary_request = request._request
+        ids_str = ",".join([str(i) for i in order_item_ids])
+        summary_request.GET = summary_request.GET.copy()
+        summary_request.GET["order_item_ids"] = ids_str
+        if coupon_code:
+            summary_request.GET["coupon"] = coupon_code
+        summary_resp = OrderPaymentSummaryAPIView().get(request)
+        if summary_resp.status_code != 200:
+            return summary_resp
+        summary = summary_resp.data
+
+        # Get parent order
+        items_qs = OrderItem.objects.select_related("order").filter(id__in=order_item_ids, order__user=request.user)
+        parent_order_ids = set(items_qs.values_list("order_id", flat=True))
+        if len(parent_order_ids) != 1:
+            return Response({"error": "order_item_ids must belong to the same order"}, status=400)
+        parent_order_id = next(iter(parent_order_ids))
+
+        total_payable = Decimal(summary["total_payable"])
+        amount_paise = int((total_payable * 100).quantize(Decimal("1")))
+
+        app_id = getattr(settings, "CASHFREE_APP_ID", None)
+        secret_key = getattr(settings, "CASHFREE_SECRET_KEY", None)
+        if not app_id or not secret_key:
+            return Response({"error": "Missing CASHFREE_APP_ID/CASHFREE_SECRET_KEY in settings"}, status=500)
+
+        # Cashfree API base URL (sandbox for testing)
+        base_url = getattr(settings, "CASHFREE_BASE_URL", "https://sandbox.cashfree.com/pg")
+        if not base_url.endswith("/pg"):
+            base_url = base_url.rstrip("/") + "/pg"
+
+        # order_id for Cashfree: alphanumeric, 3-45 chars
+        cf_order_id = f"order_{parent_order_id}_{int(dt.datetime.now().timestamp())}"
+        try:
+            cf_order_id = cf_order_id[:45]  # max 45 chars
+        except Exception:
+            pass
+
+        customer_phone = getattr(request.user, "phone", None) or getattr(request.user, "mobile_number", None) or ""
+        customer_email = getattr(request.user, "email", None) or ""
+        customer_email = customer_email if customer_email else f"user{request.user.id}@stylo.com"
+
+        payload = {
+            "order_id": cf_order_id,
+            "order_amount": float(total_payable),
+            "order_currency": "INR",
+            "order_note": f"Order {parent_order_id} - Items: {ids_str}",
+            "customer_details": {
+                "customer_id": str(request.user.id),
+                "customer_phone": str(customer_phone)[:10] if customer_phone else "9999999999",
+                "customer_email": customer_email[:100],
+            },
+            "order_tags": {
+                "app_order_id": str(parent_order_id),
+                "paid_item_ids": ids_str,
+                "user_id": str(request.user.id),
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-version": "2023-08-01",
+            "x-client-id": app_id,
+            "x-client-secret": secret_key,
+        }
+
+        try:
+            resp = requests.post(f"{base_url}/orders", json=payload, headers=headers, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as e:
+            err_detail = str(e)
+            if hasattr(e, "response") and e.response is not None:
+                try:
+                    err_body = e.response.json()
+                    err_detail = err_body.get("message", err_body.get("error", err_detail))
+                except Exception:
+                    pass
+            return Response({"error": "Failed to create Cashfree order", "detail": err_detail}, status=502)
+        except Exception as e:
+            return Response({"error": "Failed to create Cashfree order", "detail": str(e)}, status=502)
+
+        # Store Cashfree order_id on our Order for webhook lookup
+        try:
+            order = Order.objects.get(id=parent_order_id)
+            order.payment_gateway = "cashfree"
+            order.pg_order_id = data.get("cf_order_id") or cf_order_id
+            order.payment_status = "pending"
+            order.save(update_fields=["payment_gateway", "pg_order_id", "payment_status"])
+        except Exception:
+            pass
+
+        return Response({
+            "order_id": data.get("order_id") or cf_order_id,
+            "cf_order_id": data.get("cf_order_id"),
+            "payment_session_id": data.get("payment_session_id"),
+            "order_amount": data.get("order_amount"),
+            "order_currency": data.get("order_currency", "INR"),
+            "summary": summary,
+            "app_id": app_id,
+        }, status=200)
+
+
+class CashfreeWebhookAPIView(APIView):
+    """
+    Cashfree payment webhook. Handles PAYMENT_SUCCESS_WEBHOOK.
+    Configure in Cashfree Dashboard: Payment Gateway > Developers > Webhook Configuration.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        webhook_secret = getattr(settings, "CASHFREE_WEBHOOK_SECRET", None)
+        if not webhook_secret:
+            return Response({"error": "Webhook secret not configured"}, status=500)
+
+        signature = request.headers.get("x-webhook-signature") or request.headers.get("X-Webhook-Signature")
+        timestamp = request.headers.get("x-webhook-timestamp") or request.headers.get("X-Webhook-Timestamp")
+        body = request.body
+
+        if not timestamp or not signature:
+            return Response({"error": "Missing webhook headers"}, status=400)
+
+        # Verify signature: base64(hmac_sha256(secret, timestamp + raw_body))
+        signature_data = timestamp + body.decode("utf-8")
+        expected = base64.b64encode(
+            hmac.new(webhook_secret.encode("utf-8"), signature_data.encode("utf-8"), hashlib.sha256).digest()
+        ).decode("utf-8")
+        if not hmac.compare_digest(expected, signature):
+            return Response({"error": "Invalid signature"}, status=400)
+
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except Exception:
+            return Response({"error": "Invalid JSON"}, status=400)
+
+        event_type = payload.get("type")
+        data = payload.get("data") or {}
+
+        if event_type != "PAYMENT_SUCCESS_WEBHOOK":
+            return Response({"status": "ok", "ignored": event_type}, status=200)
+
+        order_data = data.get("order") or {}
+        payment_data = data.get("payment") or {}
+        cf_order_id = order_data.get("order_id")
+        cf_payment_id = payment_data.get("cf_payment_id")
+        payment_status = payment_data.get("payment_status")
+        payment_group = payment_data.get("payment_group") or ""
+
+        # Get app_order_id from order_tags
+        order_tags = order_data.get("order_tags") or {}
+        app_order_id = order_tags.get("app_order_id")
+        if not app_order_id and cf_order_id and str(cf_order_id).startswith("order_"):
+            parts = str(cf_order_id).split("_")
+            if len(parts) >= 2:
+                app_order_id = parts[1]
+
+        if not app_order_id:
+            return Response({"detail": "Ignored: app_order_id not found"}, status=200)
+
+        try:
+            order = Order.objects.get(id=int(app_order_id))
+        except Exception:
+            return Response({"detail": "Ignored: app order not found"}, status=200)
+
+        # Update order with payment details
+        order.payment_id = cf_payment_id
+        order.payment_status = "success" if payment_status == "SUCCESS" else (payment_status or "").lower()
+        order.payment_method = payment_group or payment_data.get("payment_method", "")
+        order.is_paid = payment_status == "SUCCESS"
+        order.payment_mode = "ONLINE" if payment_status == "SUCCESS" else order.payment_mode
+        order.status = "accepted"
+        order.save(update_fields=[
+            "payment_id", "payment_status", "payment_method", "is_paid", "payment_mode", "status"
+        ])
 
         return Response({"status": "ok"}, status=200)

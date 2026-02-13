@@ -159,6 +159,13 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=ORDER_STATUS, default='not_accepted')  # ready_to_dispatch, not_accepted, accepted, in_transit, trial_begin, trial_ended, cancelled, completed
     payment_mode = models.CharField(max_length=50, default='COD')
     is_paid = models.BooleanField(default=False)
+
+    # Cashfree / payment gateway fields
+    payment_gateway = models.CharField(max_length=20, blank=True, null=True, help_text="cod, cashfree, razorpay")
+    pg_order_id = models.CharField(max_length=100, blank=True, null=True, help_text="Cashfree cf_order_id / Razorpay order id")
+    payment_id = models.CharField(max_length=100, blank=True, null=True, help_text="Cashfree cf_payment_id / transaction id")
+    payment_status = models.CharField(max_length=30, blank=True, null=True, help_text="pending, success, failed, refunded")
+    payment_method = models.CharField(max_length=50, blank=True, null=True, help_text="upi, card, netbanking, wallet")
       
     # Delivery verification OTP
     delivery_otp = models.CharField(max_length=6, blank=True, null=True)

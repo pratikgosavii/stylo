@@ -82,6 +82,8 @@ path("orders/without-ordered-items/", OrdersWithoutOrderedItemsAPIView.as_view()
 path("orders/payment-summary/", OrderPaymentSummaryAPIView.as_view(), name="order-payment-summary"),
 path("orders/create-razorpay-order/", CreateRazorpayOrderAPIView.as_view(), name="create-razorpay-order"),
 path("razorpay/webhook/", RazorpayWebhookAPIView.as_view(), name="razorpay-webhook"),
+path("orders/create-cashfree-order/", CreateCashfreeOrderAPIView.as_view(), name="create-cashfree-order"),
+path("cashfree/webhook/", CashfreeWebhookAPIView.as_view(), name="cashfree-webhook"),
 
 
 

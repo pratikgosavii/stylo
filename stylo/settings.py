@@ -190,3 +190,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Cashfree Payments (configure in Cashfree Dashboard)
+CASHFREE_APP_ID = "YOUR_APP_ID"  # Dashboard > API Keys > App ID
+CASHFREE_SECRET_KEY = "YOUR_SECRET_KEY"  # Dashboard > API Keys > Secret Key
+CASHFREE_WEBHOOK_SECRET = "YOUR_WEBHOOK_SECRET"  # Dashboard > Developers > Webhook Configuration
+CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg"  # https://api.cashfree.com/pg for production
