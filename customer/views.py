@@ -984,7 +984,7 @@ class offersView(APIView):
             Q(valid_from__isnull=True) | Q(valid_from__lte=today)
         ).filter(
             Q(valid_to__isnull=True) | Q(valid_to__gte=today)
-        ).prefetch_related("applicable_products", "applicable_categories").order_by("-created_at")
+        ).order_by("-created_at")
         serializer = StoreOfferSerializer(offers_qs, many=True, context={"request": request})
         return Response(serializer.data)
     
@@ -1550,7 +1550,7 @@ class CustomerHomeScreenAPIView(APIView):
                 "main_category_id": b.main_category_id,
             })
 
-        # Store offers: StoreOffer (promotional - discount %, free delivery) from stores within 10km
+        # Store offers: StoreOffer from stores within 10km
         from django.utils import timezone as tz
         from vendor.models import StoreOffer
         today = tz.now().date()
@@ -1561,12 +1561,7 @@ class CustomerHomeScreenAPIView(APIView):
             Q(valid_from__isnull=True) | Q(valid_from__lte=today)
         ).filter(
             Q(valid_to__isnull=True) | Q(valid_to__gte=today)
-        ).prefetch_related("applicable_products", "applicable_categories").order_by("-created_at")
-        if main_category_id:
-            try:
-                store_offers_qs = store_offers_qs.filter(applicable_categories__main_category_id=int(main_category_id)).distinct()
-            except (TypeError, ValueError):
-                pass
+        ).order_by("-created_at")
         store_offers_qs = store_offers_qs[:self.SECTION_LIMIT]
         store_offers = StoreOfferSerializer(store_offers_qs, many=True, context={"request": request}).data
         for o in store_offers:
@@ -2736,7 +2731,7 @@ class CancelOrderByCustomerAPIView(APIView):
             )
 
         # Item statuses that already mean no stock (do not double-restore)
-        REVERSE_STATUSES = {"cancelled", "returned", "replace"}
+        REVERSE_STATUSES = {"cancelled"}
 
         for i in items:
             old_status = i.status
@@ -2752,6 +2747,44 @@ class CancelOrderByCustomerAPIView(APIView):
 
         from .serializers import OrderSerializer
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+
+class OrdersWithOrderedItemsAPIView(APIView):
+    """
+    GET /customer/orders/with-ordered-items/
+    Returns orders where at least one OrderItem has status='ordered'.
+    Only returns orders belonging to the logged-in customer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = Order.objects.filter(
+            user=request.user
+        ).filter(
+            items__status='ordered'
+        ).prefetch_related('items__product').distinct().order_by('-id')
+        from .serializers import OrderSerializer
+        serializer = OrderSerializer(orders, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class OrdersWithoutOrderedItemsAPIView(APIView):
+    """
+    GET /customer/orders/without-ordered-items/
+    Returns orders where none of the OrderItems have status='ordered'.
+    Only returns orders belonging to the logged-in customer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = Order.objects.filter(
+            user=request.user
+        ).exclude(
+            items__status='ordered'
+        ).prefetch_related('items__product').order_by('-id')
+        from .serializers import OrderSerializer
+        serializer = OrderSerializer(orders, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class OrderPaymentSummaryAPIView(APIView):

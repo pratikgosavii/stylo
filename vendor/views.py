@@ -983,15 +983,13 @@ class OfferViewSet(viewsets.ModelViewSet):
 
 
 class StoreOfferViewSet(viewsets.ModelViewSet):
-    """Create Offer form API: offer title, description, type (Discount % / Free Delivery), valid from/to, discount value, applicable products/categories, eligibility."""
+    """Store offer API: title, description, image, valid from/to."""
     serializer_class = StoreOfferSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        return StoreOffer.objects.filter(user=self.request.user).prefetch_related(
-            'applicable_products', 'applicable_categories'
-        ).order_by('-created_at')
+        return StoreOffer.objects.filter(user=self.request.user).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

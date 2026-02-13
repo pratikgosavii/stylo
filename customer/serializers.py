@@ -37,7 +37,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         - Order completed (delivery lives on Order, not OrderItem)
         - Product allows return/replacement
         - Within 7 days
-        - Item not already returned/replaced/cancelled
+        - Item not already cancelled
         """
         if getattr(obj.order, 'status', None) != 'completed':
             return False
@@ -56,8 +56,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
         if return_type == 'exchange' and not getattr(product, 'replacement', False):
             return False
 
-        # Item must not already be returned, replaced, or cancelled
-        blocked_status = ['returned', 'replace', 'cancelled']
+        # Item must not already be cancelled
+        blocked_status = ['cancelled']
         if obj.status in blocked_status:
             return False
 

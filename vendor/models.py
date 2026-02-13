@@ -301,13 +301,7 @@ class Offer(models.Model):
 
 
 class StoreOffer(models.Model):
-    """Promotional offer (Create Offer form): title, description, type (Discount % / Free Delivery), valid from/to, discount value, applicable products/categories, eligibility."""
-
-    ELIGIBILITY_CHOICES = [
-        ('first_time_buy', 'For first time buy'),
-        ('existing_buyers', 'For existing buyers'),
-        ('all', 'For all'),
-    ]
+    """Promotional offer: title, description, image, valid from/to."""
 
     user = models.ForeignKey(
         "users.User",
@@ -316,32 +310,9 @@ class StoreOffer(models.Model):
     )
     offer_title = models.CharField(max_length=255)
     offer_description = models.TextField(blank=True, null=True)
-    is_discount_percent = models.BooleanField(default=False)   # Offer type: Discount %
-    is_free_delivery = models.BooleanField(default=False)       # Offer type: Free Delivery
+    image = models.ImageField(upload_to="store_offers/", blank=True, null=True)
     valid_from = models.DateField(blank=True, null=True)
     valid_to = models.DateField(blank=True, null=True)
-    discount_value = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
-        blank=True,
-        null=True,
-        help_text="Percentage when offer type is Discount %",
-    )
-    eligibility_criteria = models.CharField(
-        max_length=20,
-        choices=ELIGIBILITY_CHOICES,
-        default='all',
-    )
-    applicable_products = models.ManyToManyField(
-        "product",
-        blank=True,
-        related_name="store_offers",
-    )
-    applicable_categories = models.ManyToManyField(
-        "masters.product_category",
-        blank=True,
-        related_name="store_offers",
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

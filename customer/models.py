@@ -202,13 +202,11 @@ class Order(models.Model):
     
 
 class OrderItem(models.Model):
-    """Item-level statuses only: trial, ordered, cancelled, returned, replace. Accepted/rejected/in_transit/delivered live on Order only."""
+    """Item-level statuses only: trial, ordered, cancelled. Accepted/rejected/in_transit/delivered live on Order only."""
     STATUS_CHOICES = [
         ('trial', 'Trial'),
         ('ordered', 'Ordered'),
         ('cancelled', 'Cancelled'),
-        ('returned', 'Returned'),
-        ('replace', 'Replace'),
     ]
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")

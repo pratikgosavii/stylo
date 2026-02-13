@@ -446,62 +446,17 @@ class OfferSerializer(serializers.ModelSerializer):
 
 
 class StoreOfferSerializer(serializers.ModelSerializer):
-    """Create Offer form: title, description, offer type (Discount % / Free Delivery), valid from/to, discount value, applicable products/categories, eligibility."""
-
-    offer_type = serializers.SerializerMethodField(read_only=True)
-    applicable_products = serializers.PrimaryKeyRelatedField(many=True, queryset=product.objects.all(), required=False, allow_empty=True)
-    applicable_categories = serializers.PrimaryKeyRelatedField(many=True, queryset=product_category.objects.all(), required=False, allow_empty=True)
+    """Store offer: title, description, image, valid from/to."""
 
     class Meta:
         model = StoreOffer
         fields = [
             'id', 'user',
-            'offer_title', 'offer_description',
-            'offer_type', 'is_discount_percent', 'is_free_delivery',
-            'valid_from', 'valid_to', 'discount_value',
-            'applicable_products', 'applicable_categories',
-            'eligibility_criteria', 'is_active', 'created_at',
+            'offer_title', 'offer_description', 'image',
+            'valid_from', 'valid_to',
+            'is_active', 'created_at',
         ]
         read_only_fields = ['user', 'created_at']
-
-    def get_offer_type(self, obj):
-        if obj.is_free_delivery:
-            return 'free_delivery'
-        if obj.is_discount_percent:
-            return 'discount_percent'
-        return 'discount_percent'
-
-    def validate(self, attrs):
-        offer_type = self.initial_data.get('offer_type')
-        if offer_type == 'free_delivery':
-            attrs['is_free_delivery'] = True
-            attrs['is_discount_percent'] = False
-        elif offer_type == 'discount_percent':
-            attrs['is_discount_percent'] = True
-            attrs['is_free_delivery'] = False
-        return attrs
-
-    def create(self, validated_data):
-        products = validated_data.pop('applicable_products', [])
-        categories = validated_data.pop('applicable_categories', [])
-        offer = StoreOffer.objects.create(**validated_data)
-        if products:
-            offer.applicable_products.set(products)
-        if categories:
-            offer.applicable_categories.set(categories)
-        return offer
-
-    def update(self, instance, validated_data):
-        products = validated_data.pop('applicable_products', None)
-        categories = validated_data.pop('applicable_categories', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if products is not None:
-            instance.applicable_products.set(products)
-        if categories is not None:
-            instance.applicable_categories.set(categories)
-        return instance
 
 
 class SpotlightProductSerializer(serializers.ModelSerializer):
