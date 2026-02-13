@@ -175,7 +175,7 @@ class ConfirmDeliveryAPIView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         # Complete order (delivery status on Order only; OrderItem statuses unchanged)
-        order.status = "completed"
+        order.status = "delivered"
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])
         serializer = OrderSerializer(order, context={"request": request})
