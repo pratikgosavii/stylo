@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -47,6 +48,8 @@ INSTALLED_APPS = [
     'users',
     'deliveryboy',
     'rest_framework',
+    'channels',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -113,6 +116,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'stylo.wsgi.application'
+ASGI_APPLICATION = 'stylo.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 
 # Database

@@ -2223,16 +2223,12 @@ class ProductRequestViewSet(viewsets.ModelViewSet):
         # Return only requests created by the logged-in user
         return ProductRequest.objects.filter(user=self.request.user).order_by("-created_at")
     
-
-
-from stream_chat import StreamChat  # ✅ Correct import
-
 import os
 
 
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
-from stream_chat import StreamChat
+from django.shortcuts import get_object_or_404
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from vendor.models import  vendor_store
@@ -2240,75 +2236,6 @@ from rest_framework.exceptions import ValidationError
 
 
 
-class ChatInitAPIView(APIView):
-    """
-    Single API endpoint to:
-    1. Generate a Stream token for the logged-in user
-    2. Create or get a direct chat (customer ↔ vendor)
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        api_key = getattr(settings, "STREAM_API_KEY", None)
-        api_secret = getattr(settings, "STREAM_API_SECRET", None)
-        if not api_key or not api_secret:
-            return Response({"error": "Missing Stream API credentials"}, status=500)
-
-        client = StreamChat(api_key=api_key, api_secret=api_secret)
-
-        me = request.user
-        user_id = str(me.id)
-        app_role = "customer" if getattr(me, "is_customer", False) else ("vendor" if getattr(me, "is_vendor", False) else "user")
-
-        # Create or update the Stream user
-        client.upsert_user({
-            "id": user_id,
-            "name": me.username,
-            "role": "user",
-            "app_role": app_role,
-        })
-
-        # Create Stream token for frontend use
-        token = client.create_token(user_id)
-
-        # Optional: handle direct chat creation if other_user_id is provided
-        other_user_id = request.data.get("other_user_id")
-        channel_data = None
-
-        if other_user_id:
-            User = get_user_model()
-            other = get_object_or_404(User, id=other_user_id)
-
-            # Allow only customer↔vendor pairs
-            is_allowed = (
-                (getattr(me, "is_customer", False) and getattr(other, "is_vendor", False)) or
-                (getattr(me, "is_vendor", False) and getattr(other, "is_customer", False))
-            )
-            if not is_allowed:
-                return Response({"error": "Only customer↔vendor chats allowed"}, status=403)
-
-            members = [user_id, str(other.id)]
-            channel = client.channel("messaging", data={"members": members, "distinct": True})
-            resp = channel.create(user_id)
-            channel_id = resp.get("channel", {}).get("id")
-
-            channel_data = {
-                "channel_id": channel_id,
-                "type": "messaging",
-                "members": members,
-            }
-
-        return Response({
-            "user": {
-                "id": user_id,
-                "username": me.username,
-                "role": "user",
-                "app_role": app_role,
-            },
-            "token": token,
-            "api_key": api_key,
-            "channel": channel_data,  # will be None if other_user_id not provided
-        }, status=200)
 
 
 # class StoreRatingViewSet(viewsets.ModelViewSet):
