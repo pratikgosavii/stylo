@@ -319,3 +319,24 @@ class StoreOffer(models.Model):
     def __str__(self):
         return self.offer_title
 
+
+DAYS_OF_WEEK = [
+    ('sunday', 'Sunday'),
+    ('monday', 'Monday'),
+    ('tuesday', 'Tuesday'),
+    ('wednesday', 'Wednesday'),
+    ('thursday', 'Thursday'),
+    ('friday', 'Friday'),
+    ('saturday', 'Saturday'),
+]
+
+class StoreWorkingHour(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='working_hours')
+    day = models.CharField(max_length=10, choices=DAYS_OF_WEEK)
+    open_time = models.TimeField(null=True, blank=True)
+    close_time = models.TimeField(null=True, blank=True)
+    is_open = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.day.title()} - {'Open' if self.is_open else 'Closed'}"
+

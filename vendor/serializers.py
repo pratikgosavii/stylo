@@ -6,6 +6,13 @@ from masters.serializers import *
 
 
 
+class StoreWorkingHourSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StoreWorkingHour
+        fields = ['id', 'user', 'day', 'open_time', 'close_time', 'is_open']
+        read_only_fields = ['user']
+
+
 class coupon_serializer(serializers.ModelSerializer):
     class Meta:
         model = coupon
@@ -306,6 +313,8 @@ class VendorStoreSerializer(serializers.ModelSerializer):
     featured_products = serializers.SerializerMethodField(read_only=True)
     popular_products = serializers.SerializerMethodField(read_only=True)
     is_favourite = serializers.SerializerMethodField(read_only=True)
+    working_hours = serializers.SerializerMethodField(read_only=True)
+    is_store_open = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = vendor_store
@@ -346,6 +355,8 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'store_rating',
             'reviews',
             'is_favourite',
+            'working_hours',
+            'is_store_open',
         ]
 
     def get_is_favourite(self, obj):
@@ -412,6 +423,35 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             return ReviewSerializer(qs, many=True, context=context).data
         except Exception:
             return []
+
+    def get_working_hours(self, obj):
+        """Return all working hours for this store's vendor."""
+        if not obj.user:
+            return []
+        qs = obj.user.working_hours.all()
+        return StoreWorkingHourSerializer(qs, many=True).data
+
+    def get_is_store_open(self, obj):
+        """Check if store is currently open based on IST time and vendor's working hours."""
+        if not obj.user:
+            return False
+        
+        import pytz
+        from django.utils import timezone
+        
+        # Use IST (Asia/Kolkata)
+        tz = pytz.timezone('Asia/Kolkata')
+        now_ist = timezone.now().astimezone(tz)
+        current_day = now_ist.strftime('%A').lower()
+        current_time = now_ist.time()
+
+        working_hour = obj.user.working_hours.filter(day=current_day, is_open=True).first()
+        
+        if working_hour:
+            if working_hour.open_time and working_hour.close_time:
+                return working_hour.open_time <= current_time <= working_hour.close_time
+            return True  # If is_open is true but no times set, assume open (24h or similar)
+        return False
 
     
 class DeliveryBoySerializer(serializers.ModelSerializer):

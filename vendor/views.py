@@ -295,7 +295,24 @@ class OrderViewSet(viewsets.ModelViewSet):
               .distinct()
               .order_by('-id'))
         serializer = self.get_serializer(qs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(OrderSerializer(qs, many=True).data, status=status.HTTP_200_OK)
+
+
+class StoreWorkingHourViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for vendor's store working hours.
+    Each vendor has 7 rows (one per day).
+    """
+    serializer_class = StoreWorkingHourSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return StoreWorkingHour.objects.filter(user=self.request.user).order_by('id')
+
+    def perform_create(self, serializer):
+        # Automatically assign logged-in user
+        serializer.save(user=self.request.user)
+
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404

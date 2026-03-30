@@ -32,6 +32,7 @@ router.register(r'orders', OrderViewSet, basename='orders')
 router.register(r'offer', OfferViewSet, basename="offer")
 router.register(r'store-offers', StoreOfferViewSet, basename="store-offer")
 router.register(r'spotlight-products', SpotlightProductViewSet, basename='spotlight-product')
+router.register(r'working-hours', StoreWorkingHourViewSet, basename='working-hours')
 
 
 urlpatterns = [

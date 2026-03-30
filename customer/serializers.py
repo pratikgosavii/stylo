@@ -3,7 +3,7 @@ from .models import *
 
 
 
-from vendor.serializers import product_serializer
+from vendor.serializers import product_serializer, DeliveryBoySerializer
 
 from django.utils import timezone
 import datetime
@@ -97,11 +97,12 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     user_details = UserProfileSerializer(source = 'user', read_only=True)
     address_details = AddressSerializer(source="address", read_only = True)
+    delivery_boy_details = DeliveryBoySerializer(source="delivery_boy", read_only=True)
 
     class Meta:
         model = Order
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "items", "item_total", "total_amount", "order_id", 'user_details', 'address_details', 'store_details']
+        read_only_fields = ["id", "created_at", "items", "item_total", "total_amount", "order_id", 'user_details', 'address_details', 'store_details', 'delivery_boy_details']
     
     def generate_order_id(self):
         """Generate sequential order_id like SVIND0001, SVIND0002..."""
