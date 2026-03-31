@@ -120,10 +120,33 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 class VendorStoreSerializer2(serializers.ModelSerializer):
+    is_store_open = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = vendor_store
         fields = '__all__'
+
+    def get_is_store_open(self, obj):
+        """Check if store is currently open based on IST time and vendor's working hours."""
+        if not obj.user:
+            return False
+        
+        import pytz
+        from django.utils import timezone
+        
+        # Use IST (Asia/Kolkata)
+        tz = pytz.timezone('Asia/Kolkata')
+        now_ist = timezone.now().astimezone(tz)
+        current_day = now_ist.strftime('%A').lower()
+        current_time = now_ist.time()
+
+        working_hour = obj.user.working_hours.filter(day=current_day, is_open=True).first()
+        
+        if working_hour:
+            if working_hour.open_time and working_hour.close_time:
+                return working_hour.open_time <= current_time <= working_hour.close_time
+            return True  # If is_open is true but no times set, assume open (24h or similar)
+        return False
 
 
 

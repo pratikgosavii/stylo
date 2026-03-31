@@ -302,6 +302,7 @@ class StoreWorkingHourViewSet(viewsets.ModelViewSet):
     """
     CRUD for vendor's store working hours.
     Each vendor has 7 rows (one per day).
+    Supports bulk update: send a list of objects in POST.
     """
     serializer_class = StoreWorkingHourSerializer
     permission_classes = [IsAuthenticated]
@@ -309,8 +310,35 @@ class StoreWorkingHourViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return StoreWorkingHour.objects.filter(user=self.request.user).order_by('id')
 
+    def create(self, request, *args, **kwargs):
+        """Override create to support list of objects (bulk)"""
+        data = request.data
+        if isinstance(data, list):
+            # Process bulk creation/update
+            results = []
+            for item in data:
+                day = item.get('day')
+                if not day:
+                    continue
+                # Update if exists, else create
+                obj, created = StoreWorkingHour.objects.update_or_create(
+                    user=request.user,
+                    day=day,
+                    defaults={
+                        'open_time': item.get('open_time'),
+                        'close_time': item.get('close_time'),
+                        'is_open': item.get('is_open', True)
+                    }
+                )
+                serializer = self.get_serializer(obj)
+                results.append(serializer.data)
+            return Response(results, status=status.HTTP_200_OK if results else status.HTTP_400_BAD_REQUEST)
+        
+        # Single object fallback
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
-        # Automatically assign logged-in user
+        # Automatically assign logged-in user for single object POST
         serializer.save(user=self.request.user)
 
 
