@@ -62,7 +62,6 @@ class vendor_store(models.Model):
     banner_image = models.ImageField(upload_to='store/', blank=True, null=True)
     profile_image = models.ImageField(upload_to='store/', blank=True, null=True, help_text="Store logo")
     about = models.CharField(max_length=500, blank=True, null=True, help_text="Store description")
-    business_type = models.CharField(max_length=100, blank=True, null=True, help_text="Business type")
 
     # Store contact
     store_mobile = models.CharField(max_length=20, blank=True, null=True)

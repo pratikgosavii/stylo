@@ -346,7 +346,6 @@ class VendorStoreSerializer(serializers.ModelSerializer):
             'vendor_name',
             'name',
             'about',
-            'business_type',
             'profile_image',
             'banner_image',
             'cover_media',
