@@ -1021,22 +1021,27 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return DeliveryBoy.objects.filter(user=self.request.user)
 
+    # ✅ CREATE
     def perform_create(self, serializer):
         from users.models import User
+
         username = (self.request.data.get("username") or "").strip()
         password = self.request.data.get("password")
         mobile = (self.request.data.get("mobile") or "").strip()
         email = self.request.data.get("email") or ""
 
-        # Login identifier: use username if provided, else mobile (for login: send same value as "username")
+        # ✅ Username uniqueness (DeliveryBoy)
+        if username and DeliveryBoy.objects.filter(username=username).exists():
+            raise ValidationError({"username": "Username already exists"})
+
         login_identifier = username if username else mobile
 
         account_user = None
         if login_identifier and password:
-            # Create login account: User uses mobile as USERNAME_FIELD, so we store login_identifier in mobile for delivery boy login
+            # ✅ Check login uniqueness
             if User.objects.filter(mobile=login_identifier).exists():
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError({"username": "This username/mobile is already taken for login."})
+
             account_user = User.objects.create_user(
                 mobile=login_identifier,
                 password=password,
@@ -1044,46 +1049,95 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
             )
             account_user.is_deliveryboy = True
             account_user.save(update_fields=["is_deliveryboy"])
-        serializer.save(user=self.request.user, account_user=account_user, username=username or mobile or None, mobile=mobile, email=email, password = password)
 
+        serializer.save(
+            user=self.request.user,
+            account_user=account_user,
+            username=username or None,   # ❌ removed mobile fallback
+            mobile=mobile,
+            email=email,
+        )
+
+    # ✅ PATCH → partial update only
     def patch(self, request, *args, **kwargs):
+        kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 
+    # ✅ UPDATE
     def perform_update(self, serializer):
         from users.models import User
-        instance = serializer.instance
-        username = (self.request.data.get("username") or "").strip()
-        password = self.request.data.get("password")
-        mobile = (self.request.data.get("mobile") or instance.mobile or "").strip()
-        email = self.request.data.get("email", instance.email) or ""
 
-        login_identifier = username if username else mobile
+        instance = serializer.instance
+        data = self.request.data
+
         account_user = getattr(instance, "account_user", None)
 
-        if login_identifier and password:
+        save_kwargs = {}
+
+        # ✅ Username update (only if provided)
+        if "username" in data:
+            username = (data.get("username") or "").strip()
+
+            if username:
+                exists = DeliveryBoy.objects.filter(username=username).exclude(id=instance.id).exists()
+                if exists:
+                    raise ValidationError({"username": "Username already exists"})
+
+            save_kwargs["username"] = username or None
+
+        # ✅ Mobile update
+        if "mobile" in data:
+            mobile = (data.get("mobile") or "").strip()
+            save_kwargs["mobile"] = mobile
+
+        # ✅ Email update
+        if "email" in data:
+            email = data.get("email") or ""
+            save_kwargs["email"] = email
+
+        # ✅ Password / login update
+        if "password" in data:
+            password = data.get("password")
+
+            # determine login identifier
+            new_login = (
+                (data.get("username") or "").strip()
+                or (data.get("mobile") or instance.mobile)
+            )
+
+            if not new_login:
+                raise ValidationError({"username": "Username or mobile required for login"})
+
+            # check uniqueness
             if account_user:
-                # Update existing login account - skip uniqueness check if login id unchanged (e.g. only updating password)
-                if login_identifier != account_user.mobile:
-                    if User.objects.filter(mobile=login_identifier).exists():
-                        from rest_framework.exceptions import ValidationError
-                        raise ValidationError({"username": "This username/mobile is already taken for login."})
-                account_user.mobile = login_identifier
-                account_user.set_password(password)
-                account_user.email = email or None
-                account_user.save(update_fields=["mobile", "password", "email"])
+                if new_login != account_user.mobile:
+                    if User.objects.filter(mobile=new_login).exists():
+                        raise ValidationError({"username": "Login already exists"})
             else:
-                # Create login account (was created without one)
-                if User.objects.filter(mobile=login_identifier).exists():
-                    from rest_framework.exceptions import ValidationError
-                    raise ValidationError({"username": "This username/mobile is already taken for login."})
-                account_user = User.objects.create_user(mobile=login_identifier, password=password, email=email or None)
+                if User.objects.filter(mobile=new_login).exists():
+                    raise ValidationError({"username": "Login already exists"})
+
+            if account_user:
+                account_user.mobile = new_login
+                account_user.set_password(password)
+                if "email" in data:
+                    account_user.email = data.get("email") or None
+                account_user.save()
+            else:
+                account_user = User.objects.create_user(
+                    mobile=new_login,
+                    password=password,
+                    email=data.get("email") or None,
+                )
                 account_user.is_deliveryboy = True
                 account_user.save(update_fields=["is_deliveryboy"])
 
-        save_kwargs = {"username": username or mobile or instance.username, "mobile": mobile, "email": email}
-        if account_user is not None and not getattr(instance, "account_user_id", None):
-            save_kwargs["account_user"] = account_user
+                save_kwargs["account_user"] = account_user
+
+        # ✅ IMPORTANT: only update what is sent
         serializer.save(**save_kwargs)
+
+        
 
 
 class OfferViewSet(viewsets.ModelViewSet):
