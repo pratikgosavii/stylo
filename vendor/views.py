@@ -146,8 +146,7 @@ def update_coupon(request, coupon_id):
         forms = coupon_Form(request.POST, request.FILES, instance=instance)
 
         if forms.is_valid():
-            forms = forms.save(commit=False)
-            forms.user = request.user  # assign user here
+            # `user` is not part of the form fields; preserve existing vendor ownership.
             forms.save()
             return redirect('list_coupon')
         else:
@@ -175,12 +174,53 @@ def delete_coupon(request, coupon_id):
 
 @login_required(login_url='login_admin')
 def list_coupon(request):
+    is_admin = bool(getattr(request.user, "is_superuser", False))
 
-    data = coupon.objects.filter(user = request.user)
-    context = {
-        'data': data
-    }
-    return render(request, 'list_coupon.html', context)
+    if is_admin:
+        data = coupon.objects.select_related("user").all().order_by("-id")
+    else:
+        data = coupon.objects.select_related("user").filter(user=request.user).order_by("-id")
+
+    # Admin wants vendor/company/KYC columns; compute them once to avoid N+1 queries.
+    if is_admin:
+        from users.models import KYC
+
+        user_ids = {c.user_id for c in data if getattr(c, "user_id", None)}
+
+        stores_by_user_id = {
+            s.user_id: s
+            for s in vendor_store.objects.filter(user_id__in=user_ids).select_related("user")
+        }
+        kyc_by_user_id = {
+            k.user_id: k
+            for k in KYC.objects.filter(user_id__in=user_ids).select_related("user")
+        }
+
+        def full_name(u):
+            if not u:
+                return "-"
+            parts = [getattr(u, "first_name", "") or "", getattr(u, "last_name", "") or ""]
+            name = " ".join([p for p in parts if p]).strip()
+            return name or getattr(u, "mobile", None) or str(u)
+
+        # Attach computed attributes for template rendering
+        for c in data:
+            store = stores_by_user_id.get(c.user_id)
+            kyc = kyc_by_user_id.get(c.user_id)
+
+            c.vendor_name = full_name(getattr(store, "user", None) or getattr(c, "user", None))
+            c.company_name = getattr(store, "name", None) or "-"
+            c.registration_number = getattr(kyc, "gst", None) or "-"
+            # "Registration Email" -> vendor store email if available, else user email
+            c.registration_email = (
+                getattr(store, "store_email", None)
+                or getattr(getattr(store, "user", None), "email", None)
+                or getattr(getattr(c, "user", None), "email", None)
+                or "-"
+            )
+
+    context = {"data": data, "is_admin": is_admin}
+    return render(request, "list_coupon.html", context)
 
 
 @login_required(login_url='login_admin')
@@ -688,6 +728,33 @@ class DeliveryBoyLogoutAPIView(APIView):
                 pass
         return Response({"message": "Logged out"}, status=status.HTTP_200_OK)
 
+
+class DeliveryBoyHistoryAPIView(APIView):
+    """
+    Delivery boy can fetch his own delivery/order history.
+    Uses DeliveryBoy.account_user to resolve the profile.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, "is_deliveryboy", False):
+            return Response({"detail": "Not a delivery boy account"}, status=status.HTTP_403_FORBIDDEN)
+
+        delivery_boy = DeliveryBoy.objects.filter(account_user=request.user).first()
+        if not delivery_boy:
+            return Response({"detail": "Delivery boy profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        qs = (
+            Order.objects.filter(delivery_boy=delivery_boy)
+            .prefetch_related("items__product")
+            .order_by("-id")
+        )
+
+        # OrderSerializer is imported later via `from customer.serializers import *`.
+        serializer = OrderSerializer(qs, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class AcceptOrderAPIView(APIView):
     """
     POST /vendor/orders/<order_id>/accept/
@@ -945,7 +1012,7 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
             )
             account_user.is_deliveryboy = True
             account_user.save(update_fields=["is_deliveryboy"])
-        serializer.save(user=self.request.user, account_user=account_user, username=username or mobile or None, mobile=mobile, email=email)
+        serializer.save(user=self.request.user, account_user=account_user, username=username or mobile or None, mobile=mobile, email=email, password = password)
 
     def perform_update(self, serializer):
         from users.models import User

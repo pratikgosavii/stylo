@@ -25,6 +25,12 @@
                                         <thead>
                                             <tr>
                                                 <th>#</th>
+                                                {% if is_admin %}
+                                                    <th>Vendor Name</th>
+                                                    <th>Company Name</th>
+                                                    <th>Registration Number</th>
+                                                    <th>Registration Email</th>
+                                                {% endif %}
                                                 <th>Campaign Name</th>
                                                 <th>Description</th>
                                                 <th>Status</th>
@@ -36,6 +42,12 @@
                                             {% for i in data %}
                                             <tr>
                                                 <td>{{ forloop.counter }}</td>
+                                                {% if is_admin %}
+                                                    <td>{{ i.vendor_name|default:"-" }}</td>
+                                                    <td>{{ i.company_name|default:"-" }}</td>
+                                                    <td>{{ i.registration_number|default:"-" }}</td>
+                                                    <td>{{ i.registration_email|default:"-" }}</td>
+                                                {% endif %}
                                                 <td>{{ i.campaign_name }}</td>
                                                 <td>{{ i.description }}</td>
                                                 <td>

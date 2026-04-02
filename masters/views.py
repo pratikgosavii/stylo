@@ -168,12 +168,51 @@ class get_state(ListAPIView):
 
 @login_required(login_url='login_admin')
 def list_notification_campaigns(request):
+    is_admin = bool(getattr(request.user, "is_superuser", False))
 
-    data = NotificationCampaign.objects.all()
-    context = {
-        'data': data
-    }
-    return render(request, 'list_notification_campaigns.html', context)
+    # Select related vendor store + owner to show vendor columns efficiently in admin view.
+    data_qs = NotificationCampaign.objects.select_related("store", "store__user").all().order_by("-id")
+    data = list(data_qs)
+
+    if is_admin:
+        from users.models import KYC
+
+        store_user_ids = {
+            c.store.user_id
+            for c in data
+            if getattr(c, "store", None) is not None and getattr(c.store, "user_id", None)
+        }
+
+        kyc_by_user_id = {
+            k.user_id: k
+            for k in KYC.objects.filter(user_id__in=store_user_ids).select_related("user")
+        }
+
+        def full_name(u):
+            if not u:
+                return "-"
+            parts = [getattr(u, "first_name", "") or "", getattr(u, "last_name", "") or ""]
+            name = " ".join([p for p in parts if p]).strip()
+            return name or getattr(u, "mobile", None) or str(u)
+
+        for c in data:
+            store = getattr(c, "store", None)
+            vendor_user = getattr(store, "user", None) if store else None
+            kyc = kyc_by_user_id.get(getattr(store, "user_id", None)) if store else None
+
+            c.vendor_name = full_name(vendor_user)
+            c.company_name = getattr(store, "name", None) or "-"
+            c.registration_number = getattr(kyc, "gst", None) or "-"
+            # "Registration Email" -> store email if available, else vendor user email
+            c.registration_email = (
+                getattr(store, "store_email", None)
+                or getattr(vendor_user, "email", None)
+                or getattr(getattr(c, "user", None), "email", None)
+                or "-"
+            )
+
+    context = {"data": data, "is_admin": is_admin}
+    return render(request, "list_notification_campaigns.html", context)
 
 
 

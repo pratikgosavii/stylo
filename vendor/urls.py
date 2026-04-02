@@ -63,6 +63,7 @@ urlpatterns = [
 
     path("delivery-boy/login/", DeliveryBoyLoginAPIView.as_view(), name="delivery-boy-login"),
     path("delivery-boy/logout/", DeliveryBoyLogoutAPIView.as_view(), name="delivery-boy-logout"),
+    path("delivery-boy/history/", DeliveryBoyHistoryAPIView.as_view(), name="delivery-boy-history"),
 
 
 ]  + router.urls

@@ -259,8 +259,11 @@ class DeliveryBoy(models.Model):
     name = models.CharField(max_length=100)
     username = models.CharField(max_length=150, unique=True, blank=True, null=True, help_text="Login username for delivery boy")
     mobile = models.CharField(max_length=15)
+    password = models.CharField(max_length=100, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     photo = models.ImageField(upload_to='delivery_boys/', null=True, blank=True)
+    # New image field (keep `photo` for backward compatibility with existing templates/APIs).
+    image = models.ImageField(upload_to='delivery_boys/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     total_deliveries = models.PositiveIntegerField(default=0)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE)
