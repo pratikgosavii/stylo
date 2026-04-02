@@ -1046,6 +1046,9 @@ class DeliveryBoyViewSet(viewsets.ModelViewSet):
             account_user.save(update_fields=["is_deliveryboy"])
         serializer.save(user=self.request.user, account_user=account_user, username=username or mobile or None, mobile=mobile, email=email, password = password)
 
+    def patch(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         from users.models import User
         instance = serializer.instance
