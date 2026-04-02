@@ -307,6 +307,13 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        # Superuser can view all orders; vendor sees only orders containing their products.
+        qs = Order.objects.prefetch_related('items__product').order_by('-id')
+        if getattr(self.request.user, "is_superuser", False):
+            return qs
+        return qs.filter(items__product__user=self.request.user).distinct()
+
     def update(self, request, *args, **kwargs):
         """Restrict update to only allowed fields"""
         instance = self.get_object()

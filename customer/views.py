@@ -219,6 +219,7 @@ class ListProducts(ListAPIView):
     ordering: -sales_price, sales_price, -avg_rating, avg_rating, name, -created_at, etc.
     """
     serializer_class = product_serializer
+    NEARBY_KM = 10
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = ProductFilter
@@ -231,6 +232,7 @@ class ListProducts(ListAPIView):
         qs = (
             product.objects.filter(is_active=True, parent__isnull=True)
             .select_related("user", "main_category", "category", "sub_category")
+            .prefetch_related("gallery_images", "variants")
             .annotate(
                 avg_rating=Coalesce(Avg("items__product_reviews__rating"), Value(0), output_field=FloatField())
             )
@@ -255,29 +257,195 @@ class ListProducts(ListAPIView):
                 pass
 
         if user_lat is not None and user_lon is not None:
-            stores = list(
-                vendor_store.objects.filter(
-                    is_active=True,
-                    latitude__isnull=False,
-                    longitude__isnull=False,
-                ).only("id", "user_id", "latitude", "longitude")
-            )
-            if stores:
-                store_distances = []
-                for s in stores:
-                    try:
-                        d = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
-                    except (TypeError, ValueError):
-                        d = 999999
+            # Bounding-box prefilter so we don't scan all stores.
+            import math
+
+            nearby_km = self.NEARBY_KM
+            lat_delta = nearby_km / 111.0
+            try:
+                lon_delta = nearby_km / (111.0 * max(0.1, math.cos(math.radians(float(user_lat)))))
+            except Exception:
+                lon_delta = nearby_km / 111.0
+
+            stores_qs = vendor_store.objects.filter(
+                is_active=True,
+                latitude__isnull=False,
+                longitude__isnull=False,
+                latitude__gte=(user_lat - lat_delta),
+                latitude__lte=(user_lat + lat_delta),
+                longitude__gte=(user_lon - lon_delta),
+                longitude__lte=(user_lon + lon_delta),
+            ).only("user_id", "latitude", "longitude")
+
+            # Compute exact distance only for candidates inside the box.
+            store_distances = []
+            for s in stores_qs:
+                try:
+                    d = _haversine_km(user_lat, user_lon, float(s.latitude), float(s.longitude))
+                except (TypeError, ValueError):
+                    continue
+                if d <= nearby_km:
                     store_distances.append((s.user_id, d))
-                store_distances.sort(key=lambda x: x[1])
-                ordered_user_ids = [uid for uid, _ in store_distances]
+
+            store_distances.sort(key=lambda x: x[1])
+            ordered_user_ids = [uid for uid, _ in store_distances][:30]  # cap for CASE ordering
+
+            if ordered_user_ids:
+                qs = qs.filter(user_id__in=ordered_user_ids)
                 whens = [When(user_id=uid, then=Value(i)) for i, uid in enumerate(ordered_user_ids)]
                 qs = qs.annotate(
                     _nearby_order=Case(*whens, default=Value(999999), output_field=IntegerField())
                 ).order_by("_nearby_order", "id")
 
         return qs.distinct()
+
+    def list(self, request, *args, **kwargs):
+        """
+        Fast response for list-products:
+        - View-level caching (short TTL)
+        - Precompute favourite ids + reviews + store map to avoid serializer N+1
+        """
+        from django.core.cache import cache
+
+        # Cache key includes the full querystring + pagination controls.
+        query_string = request.query_params.urlencode()
+        cache_key = f"cust:list-products:v2:user={request.user.id}:q={query_string}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK)
+
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
+        # If pagination is disabled for some reason, fall back to normal serializer path.
+        if page is None:
+            context = self.get_serializer_context()
+            # Minimal maps (still avoids N+1 for is_favourite/store/reviews/avg)
+            items = list(queryset[:10])
+            product_ids = [p.id for p in items]
+            # Return quickly; full non-paginated responses may be large.
+            from customer.models import Favourite, Review
+            from django.db.models import Avg, Count, Value as V, FloatField
+            from django.db.models.functions import Coalesce as DBCoalesce
+            from customer.serializers import ReviewSerializer
+            from vendor.models import vendor_store
+            from vendor.serializers import VendorStoreSerializer2
+
+            user_fav_ids = set(
+                Favourite.objects.filter(user=request.user, product_id__in=product_ids)
+                .values_list("product_id", flat=True)
+            )
+
+            rows = (
+                Review.objects.filter(order_item__product_id__in=product_ids)
+                .values("order_item__product_id")
+                .annotate(
+                    avg_rating=DBCoalesce(Avg("rating"), V(0.0), output_field=FloatField()),
+                    review_count=Count("id"),
+                )
+            )
+            avg_rating_map = {r["order_item__product_id"]: float(r["avg_rating"] or 0.0) for r in rows}
+            review_count_map = {r["order_item__product_id"]: r["review_count"] for r in rows}
+
+            reviews_qs = (
+                Review.objects.filter(order_item__product_id__in=product_ids)
+                .select_related("order_item", "user")
+                .prefetch_related("photos")
+                .order_by("-created_at")
+            )
+            reviews_by_pid = {pid: [] for pid in product_ids}
+            for rv in reviews_qs:
+                pid = rv.order_item.product_id
+                if pid in reviews_by_pid:
+                    reviews_by_pid[pid].append(rv)
+            reviews_map = {}
+            for pid, rev_objs in reviews_by_pid.items():
+                top4 = rev_objs[:4]
+                reviews_map[pid] = ReviewSerializer(top4, many=True, context={"request": request}).data
+
+            store_user_ids = list({request_obj.user_id for request_obj in items if getattr(request_obj, "user_id", None)})
+            stores_qs = vendor_store.objects.filter(user_id__in=store_user_ids).prefetch_related("user__working_hours")
+            store_map = {s.user_id: VendorStoreSerializer2(s).data for s in stores_qs}
+
+            context.update(
+                {
+                    "reviews_map": reviews_map,
+                    "avg_rating_map": avg_rating_map,
+                    "review_count_map": review_count_map,
+                    "user_fav_ids": user_fav_ids,
+                    "store_map": store_map,
+                }
+            )
+            serializer = self.get_serializer(items, many=True, context=context)
+            data = serializer.data
+            cache.set(cache_key, data, timeout=20)
+            return Response(data, status=status.HTTP_200_OK)
+
+        # Paginated path (normal DRF): page is a list/queryset of Product objects.
+        product_ids = [p.id for p in page]
+
+        from customer.models import Favourite, Review
+        from django.db.models import Avg, Count, Value as V, FloatField
+        from django.db.models.functions import Coalesce as DBCoalesce
+        from customer.serializers import ReviewSerializer
+        from vendor.models import vendor_store
+        from vendor.serializers import VendorStoreSerializer2
+
+        # Favourite ids (only for products in this page)
+        user_fav_ids = set(
+            Favourite.objects.filter(user=request.user, product_id__in=product_ids)
+            .values_list("product_id", flat=True)
+        )
+
+        # Reviews + aggregates (only for products in this page)
+        rows = (
+            Review.objects.filter(order_item__product_id__in=product_ids)
+            .values("order_item__product_id")
+            .annotate(
+                avg_rating=DBCoalesce(Avg("rating"), V(0.0), output_field=FloatField()),
+                review_count=Count("id"),
+            )
+        )
+        avg_rating_map = {r["order_item__product_id"]: float(r["avg_rating"] or 0.0) for r in rows}
+        review_count_map = {r["order_item__product_id"]: r["review_count"] for r in rows}
+
+        reviews_qs = (
+            Review.objects.filter(order_item__product_id__in=product_ids)
+            .select_related("order_item", "user")
+            .prefetch_related("photos")
+            .order_by("-created_at")
+        )
+        reviews_by_pid = {pid: [] for pid in product_ids}
+        for rv in reviews_qs:
+            pid = rv.order_item.product_id
+            if pid in reviews_by_pid:
+                reviews_by_pid[pid].append(rv)
+
+        reviews_map = {}
+        for pid, rev_objs in reviews_by_pid.items():
+            top4 = rev_objs[:4]
+            reviews_map[pid] = ReviewSerializer(top4, many=True, context={"request": request}).data
+
+        # Store map for vendor users present in this page
+        store_user_ids = list({p.user_id for p in page if getattr(p, "user_id", None)})
+        stores_qs = vendor_store.objects.filter(user_id__in=store_user_ids).prefetch_related("user__working_hours")
+        store_map = {s.user_id: VendorStoreSerializer2(s).data for s in stores_qs}
+
+        serializer_context = self.get_serializer_context()
+        serializer_context.update(
+            {
+                "reviews_map": reviews_map,
+                "avg_rating_map": avg_rating_map,
+                "review_count_map": review_count_map,
+                "user_fav_ids": user_fav_ids,
+                "store_map": store_map,
+            }
+        )
+
+        serializer = self.serializer_class(page, many=True, context=serializer_context)
+        response = self.get_paginated_response(serializer.data)
+        cache.set(cache_key, response.data, timeout=30)
+        return response
     
 
 

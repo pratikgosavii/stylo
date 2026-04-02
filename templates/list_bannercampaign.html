@@ -97,10 +97,10 @@
                                                         <td>{{ banner.created_at|date:"d M Y" }}</td>
                                                         <td>
                                                             <a href="{% url 'update_bannercampaign' banner.id %}">
-                                                                <i class="bi bi-pencil-square text-primary" title="Edit"></i>
+                                                                <i class="bi bi-pencil-square text-primary action-icons edit" title="Edit"></i>
                                                             </a>
                                                             <a href="{% url 'delete_bannercampaign' banner.id %}">
-                                                                <i class="bi bi-trash text-danger" title="Delete"></i>
+                                                                <i class="bi bi-trash text-danger action-icons delete" title="Delete"></i>
                                                             </a>
                                                         </td>
                                                     </tr>

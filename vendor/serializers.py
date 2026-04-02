@@ -103,17 +103,24 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         return self._get_reviews_queryset(obj).count()
 
     def get_is_favourite(self, obj):
+        """
+        Fast path: when the view precomputes favourite IDs for this user
+        (context key: `user_fav_ids`), avoid extra DB queries.
+        """
+        user_fav_ids = self.context.get("user_fav_ids")
+        if user_fav_ids is not None:
+            return obj.id in user_fav_ids
+
         from customer.models import Favourite
 
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
 
-        # ✅ Cache favourite IDs (only one DB query per request)
+        # Fallback (should be rare): one query per serializer instance.
         if not hasattr(self, "_user_fav_ids"):
             self._user_fav_ids = set(
-                Favourite.objects.filter(user=request.user)
-                .values_list("product_id", flat=True)
+                Favourite.objects.filter(user=request.user).values_list("product_id", flat=True)
             )
 
         return obj.id in self._user_fav_ids
@@ -246,13 +253,21 @@ class product_serializer(serializers.ModelSerializer):
         return self._get_reviews_queryset(obj).count()
 
     def get_store(self, obj):
+        """
+        Fast path: when the view precomputes stores for vendor users
+        (context key: `store_map`), avoid per-product `vendor_store.first()` calls.
+        """
+        store_map = self.context.get("store_map")
+        if store_map is not None:
+            return store_map.get(getattr(obj, "user_id", None))
+
         try:
-            # Assuming one store per user
+            # Assuming one store per user (fallback: can trigger N+1 if view doesn't optimize).
             store = obj.user.vendor_store.first()  # related_name='vendor_store'
             if store:
                 from .serializers import VendorStoreSerializer2
                 return VendorStoreSerializer2(store).data
-        except:
+        except Exception:
             return None
         
 

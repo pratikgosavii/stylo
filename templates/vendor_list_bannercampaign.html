@@ -98,8 +98,8 @@
                                                         <td>{{ banner.created_at|date:"d M Y" }}</td>
                                                         <td>
                                                             {% if not banner.is_approved %}
-                                                                <a href="{% url 'approve_bannercampaign' banner.id %}" class="btn btn-sm btn-success" title="Approve">
-                                                                    <i class="bi bi-check-circle"></i> Approve
+                                                                <a href="{% url 'approve_bannercampaign' banner.id %}" title="Approve">
+                                                                    <i class="bi bi-check-circle text-success action-icons edit"></i>
                                                                 </a>
                                                             {% endif %}
                                                         </td>
@@ -107,7 +107,7 @@
                                                 {% endfor %}
                                             {% else %}
                                                 <tr>
-                                                    <td colspan="6" class="text-center">No banners found.</td>
+                                                    <td colspan="7" class="text-center">No banners found.</td>
                                                 </tr>
                                             {% endif %}
                                         </tbody>
