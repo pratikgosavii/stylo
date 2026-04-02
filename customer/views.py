@@ -1365,6 +1365,22 @@ class CustomerHomeScreenAPIView(APIView):
         req_lon = request.query_params.get("longitude")
         main_category_id = request.query_params.get("main_category_id")
 
+        # --- Cache (per user + location + category) ---
+        # Short TTL to keep home fast while still fresh.
+        from django.core.cache import cache
+        lat_key = None
+        lon_key = None
+        try:
+            lat_key = round(float(req_lat), 3) if req_lat is not None else None
+            lon_key = round(float(req_lon), 3) if req_lon is not None else None
+        except (TypeError, ValueError):
+            lat_key = None
+            lon_key = None
+        cache_key = f"home:v1:user={getattr(user,'id',None)}:lat={lat_key}:lon={lon_key}:mc={main_category_id or ''}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK)
+
         # User location: query params or default address (required for 10km filter)
         user_lat, user_lon = None, None
         default_address = None
@@ -1388,7 +1404,23 @@ class CustomerHomeScreenAPIView(APIView):
         # Stores nearby: only within 10km
         stores_qs = vendor_store.objects.filter(
             is_active=True, latitude__isnull=False, longitude__isnull=False
-        ).only("id", "user_id", "name", "profile_image")
+        ).only("id", "user_id", "name", "profile_image", "banner_image", "latitude", "longitude")
+
+        # Bounding-box prefilter to avoid scanning all stores in Python.
+        # (Approx: 1 deg lat ~ 111km)
+        if user_lat is not None and user_lon is not None:
+            lat_delta = self.NEARBY_KM / 111.0
+            try:
+                lon_delta = self.NEARBY_KM / (111.0 * max(0.1, math.cos(math.radians(float(user_lat)))))
+            except Exception:
+                lon_delta = self.NEARBY_KM / 111.0
+            stores_qs = stores_qs.filter(
+                latitude__gte=(user_lat - lat_delta),
+                latitude__lte=(user_lat + lat_delta),
+                longitude__gte=(user_lon - lon_delta),
+                longitude__lte=(user_lon + lon_delta),
+            )
+
         stores_list = list(stores_qs)
         stores_nearby = []
         vendor_user_ids = []
@@ -1455,8 +1487,7 @@ class CustomerHomeScreenAPIView(APIView):
         banners_qs = banners_qs.select_related("user", "product").order_by("-created_at")[:self.SECTION_LIMIT]
         banners = []
         for b in banners_qs:
-            store = getattr(b.user, "vendor_store", None)
-            store_obj = store.first() if store else None
+            store_obj = store_by_user_id.get(getattr(b, "user_id", None))
             banner_data = {
                 "id": b.id,
                 "title": b.campaign_name or "",
@@ -1494,7 +1525,8 @@ class CustomerHomeScreenAPIView(APIView):
             return prod_data
 
         # Random products: 10 random from stores within 10km
-        products_random = product_filter.select_related("user", "main_category", "category", "sub_category").order_by("?")[:self.SECTION_LIMIT]
+        # Avoid `order_by("?")` (very slow on large tables). Use latest items instead.
+        products_random = product_filter.select_related("user", "main_category", "category", "sub_category").order_by("-id")[:self.SECTION_LIMIT]
         random_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_random]
 
         # Favourites: 10 user favourites from stores within 10km
@@ -1506,7 +1538,7 @@ class CustomerHomeScreenAPIView(APIView):
                 favourites_qs = favourites_qs.filter(product__main_category_id=int(main_category_id))
             except (TypeError, ValueError):
                 pass
-        favourites_qs = favourites_qs.order_by("?")[:self.SECTION_LIMIT]
+        favourites_qs = favourites_qs.order_by("-id")[:self.SECTION_LIMIT]
         favourite_products = []
         for fav in favourites_qs:
             p = fav.product
@@ -1517,7 +1549,7 @@ class CustomerHomeScreenAPIView(APIView):
         products_top_picks = (
             product_filter.filter(is_popular=True)
             .select_related("user", "main_category", "category", "sub_category")
-            .order_by("?")[:self.SECTION_LIMIT]
+            .order_by("-id")[:self.SECTION_LIMIT]
         )
         top_picks = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_top_picks]
 
@@ -1525,13 +1557,13 @@ class CustomerHomeScreenAPIView(APIView):
         products_featured = (
             product_filter.filter(is_featured=True)
             .select_related("user", "main_category", "category", "sub_category")
-            .order_by("?")[:self.SECTION_LIMIT]
+            .order_by("-id")[:self.SECTION_LIMIT]
         )
         if not products_featured.exists():
             products_featured = (
                 product_filter.select_related("user", "main_category", "category", "sub_category")
                 .exclude(id__in=[p.get("id") for p in random_products if isinstance(p, dict) and p.get("id")])
-                .order_by("?")[:self.SECTION_LIMIT]
+                .order_by("-id")[:self.SECTION_LIMIT]
             )
         featured_products = [_enrich_product(p, store_by_user_id.get(p.user_id)) for p in products_featured]
 
@@ -1590,6 +1622,7 @@ class CustomerHomeScreenAPIView(APIView):
             "store_offers": store_offers,
             "featured_products": featured_products,
         }
+        cache.set(cache_key, payload, timeout=60)
         return Response(payload, status=status.HTTP_200_OK)
 
 

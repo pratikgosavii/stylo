@@ -88,6 +88,14 @@ class vendor_store(models.Model):
     is_active = models.BooleanField(default=True)
     is_online = models.BooleanField(default=False)
 
+    class Meta:
+        indexes = [
+            # Nearby store queries + active filter
+            models.Index(fields=["is_active", "latitude", "longitude"]),
+            # Common joins/filters by vendor user
+            models.Index(fields=["user", "is_active"]),
+        ]
+
 
 class StoreCoverMedia(models.Model):
     """Store cover photos or videos (multiple). Each item is either image or video."""
@@ -137,6 +145,13 @@ class BannerCampaign(models.Model):
     campaign_name = models.CharField(max_length=255)
     is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["is_approved", "created_at"]),
+            models.Index(fields=["user", "is_approved", "created_at"]),
+            models.Index(fields=["main_category", "is_approved", "created_at"]),
+        ]
 
     def __str__(self):
         return self.campaign_name
@@ -228,6 +243,17 @@ class product(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            # Home screen product filter (active + vendor)
+            models.Index(fields=["is_active", "user", "id"]),
+            # Popular/featured sections
+            models.Index(fields=["is_active", "is_popular", "id"]),
+            models.Index(fields=["is_active", "is_featured", "id"]),
+            # Category filter (main category is optional)
+            models.Index(fields=["is_active", "main_category", "id"]),
+        ]
+
     def __str__(self):
         return self.name
     
@@ -317,6 +343,12 @@ class StoreOffer(models.Model):
     valid_to = models.DateField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "is_active", "created_at"]),
+            models.Index(fields=["is_active", "valid_from", "valid_to"]),
+        ]
 
     def __str__(self):
         return self.offer_title

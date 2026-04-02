@@ -205,6 +205,13 @@ class Order(models.Model):
     cancel_other = models.BooleanField(default=False)
     cancel_other_reason = models.TextField(blank=True, null=True, help_text="Text reason when 'other' is selected")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["delivery_boy", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+ 
     
     
 
@@ -255,6 +262,10 @@ class Favourite(models.Model):
 
     class Meta:
         unique_together = ("user", "product")
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["product", "created_at"]),
+        ]
 
 class FavouriteStore(models.Model):
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="favourites_user")
