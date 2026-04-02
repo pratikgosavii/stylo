@@ -755,6 +755,31 @@ class DeliveryBoyHistoryAPIView(APIView):
         serializer = OrderSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+class DeliveryBoyHistoryByIdAPIView(APIView):
+    """
+    Vendor/admin can fetch delivery history for a specific DeliveryBoy id.
+    Only the vendor who owns that DeliveryBoy (DeliveryBoy.user == request.user) or a superuser is allowed.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, delivery_boy_id: int):
+        delivery_boy = DeliveryBoy.objects.filter(id=delivery_boy_id).first()
+        if not delivery_boy:
+            return Response({"detail": "Delivery boy not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if (delivery_boy.user_id != getattr(request.user, "id", None)) and (not getattr(request.user, "is_superuser", False)):
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        qs = (
+            Order.objects.filter(delivery_boy=delivery_boy)
+            .prefetch_related("items__product")
+            .order_by("-id")
+        )
+        serializer = OrderSerializer(qs, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class AcceptOrderAPIView(APIView):
     """
     POST /vendor/orders/<order_id>/accept/
