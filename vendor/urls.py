@@ -49,7 +49,7 @@ urlpatterns = [
     path("orders/<int:order_id>/reject/", RejectOrderAPIView.as_view(), name="vendor-reject-order"),
     path("orders/<int:order_id>/ready-to-dispatch/", ReadyToDispatchOrderAPIView.as_view(), name="vendor-ready-to-dispatch"),
     path("orders/<int:order_id>/set-status/", CommonOrderStatusUpdateAPIView.as_view(), name="common-order-status-update"),
-    path("orders/<int:order_id>/confirm-delivery/", ConfirmDeliveryByOTPAPIView.as_view(), name="confirm-delivery-by-otp"),
+
 
     path('add-coupon/', add_coupon, name='add_coupon'),
     path('update-coupon/<coupon_id>', update_coupon, name='update_coupon'),

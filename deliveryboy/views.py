@@ -152,7 +152,7 @@ class StartDeliveryAPIView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class ConfirmDeliveryAPIView(APIView):
+class ConfirmDeliveryByOTPAPIView(APIView):
     """
     POST /deliveryboy/orders/<order_id>/confirm-delivery/
     Mark order as reached/delivered. No OTP required.

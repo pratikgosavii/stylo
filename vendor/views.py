@@ -913,33 +913,7 @@ class CommonOrderStatusUpdateAPIView(APIView):
         return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
-class ConfirmDeliveryByOTPAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request, order_id):
-        """
-        Delivery boy marks order as reached/delivered. No OTP required.
-        Marks all items as delivered and completes the order.
-        Only the assigned delivery boy can confirm.
-        """
-        try:
-            order = Order.objects.prefetch_related("items__product", "delivery_boy").get(id=order_id)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Only assigned delivery boy can confirm delivery
-        if not order.delivery_boy or getattr(order.delivery_boy, "account_user_id", None) != request.user.id:
-            return Response({"error": "Forbidden: not assigned delivery boy"}, status=status.HTTP_403_FORBIDDEN)
-
-        # Complete order (delivery status lives on Order only; OrderItem statuses unchanged)
-        order.status = "delivered"
-        order.delivery_otp = None
-        order.save(update_fields=["status", "delivery_otp"])
-
-        return Response(OrderSerializer(order, context={"request": request}).data, status=status.HTTP_200_OK)
-
-
-        
 
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
