@@ -140,6 +140,7 @@ class Order(models.Model):
         ('not_accepted', 'Not Accepted'),
         ('accepted', 'Accepted'),
         ('in_transit', 'In Transit'),
+        ('reached', 'Reached'),
         ('trial_begin', 'Trial Begin'),
         ('trial_ended', 'Trial Ended'),
         ('delivered', 'Delivered'),

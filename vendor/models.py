@@ -21,15 +21,8 @@ class coupon(models.Model):
     ("online_pay", "Online Pay"),
     ]
 
-    TYPE_CHOICES = [
-        ('percent', 'Percentage'),
-        ('amount', 'Amount'),
-    ]
-    
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, null=True, blank=True)
     coupon_type = models.CharField(max_length=10, choices=COUPON_TYPE_CHOICES, default='percent')  # 👈 Add this
-    type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='percent')  # 👈 Add this
-    customer_id = models.IntegerField(null=True, blank=True)
     code = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=50)
     description = models.CharField(max_length=500, null=True, blank=True)
@@ -40,7 +33,6 @@ class coupon(models.Model):
     image = models.ImageField(upload_to='doctor_images/', null=True, blank=True)
     start_date = models.DateTimeField(default=now)
     end_date = models.DateTimeField()
-    only_followers = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

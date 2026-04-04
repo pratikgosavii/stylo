@@ -494,8 +494,12 @@ class VendorStoreSerializer(serializers.ModelSerializer):
 class DeliveryBoySerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryBoy
-        fields = '__all__'
-        read_only_fields = ["user"]   # 👈 Important
+        fields = [
+            "id", "name", "username", "mobile", "email", 
+            "photo", "image", "is_active", "total_deliveries", 
+            "user", "account_user"
+        ]
+        read_only_fields = ["user"]
 
     
 class OfferSerializer(serializers.ModelSerializer):

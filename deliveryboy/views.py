@@ -152,6 +152,41 @@ class StartDeliveryAPIView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class MarkOrderReachedAPIView(APIView):
+    """
+    POST /deliveryboy/orders/<order_id>/mark-reached/
+    Mark order as reached (delivery boy arrived). Only the assigned delivery boy can call this.
+    Auth: delivery boy JWT.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        if not getattr(request.user, "is_deliveryboy", False):
+            return Response(
+                {"error": "Not a delivery boy account"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        delivery_boy = DeliveryBoy.objects.filter(account_user=request.user).first()
+        if not delivery_boy:
+            return Response(
+                {"error": "Delivery boy profile not found"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not order.delivery_boy or order.delivery_boy.id != delivery_boy.id:
+            return Response(
+                {"error": "Forbidden: order is not assigned to you"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        order.status = "reached"
+        order.save(update_fields=["status"])
+        serializer = OrderSerializer(order, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class ConfirmDeliveryByOTPAPIView(APIView):
     """
     POST /deliveryboy/orders/<order_id>/confirm-delivery/

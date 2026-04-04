@@ -87,10 +87,7 @@
                             {{ form.title }}
                         </div>
                         
-                        <div class="mb-4">
-                            <label for="code" class="form-label">Type :</label>
-                            {{ form.type }}
-                        </div>
+
                         
                         <div class="mb-4">
                             <label for="discount_percentage" class="form-label">Discount Percentage:</label>
@@ -112,10 +109,7 @@
                             {{ form.max_discount }}
                         </div>
 
-                        <div class="mb-4">
-                            <label for="max_discount" class="form-label">Customer ID:</label>
-                            {{ form.customer_id }}
-                        </div>
+
 
                         <div class="mb-4">
                             <label for="code" class="form-label">Description:</label>
@@ -133,8 +127,6 @@
                         </div>
                         
                         <div class="mb-4">
-                            <label for="is_active" class="form-label">Only Followers:</label>
-                            {{ form.only_followers }}
                             <label for="is_active" class="form-label">Active:</label>
                             {{ form.is_active }}
                         </div>
@@ -174,30 +166,7 @@
     
     
     
-    <script>
-        function toggleDiscountFields() {
 
-            const typeSelect = document.getElementById("id_type");
-            const percentField = document.getElementById('id_discount_percentage').parentElement;
-            const amountField = document.getElementById('id_discount_amount').parentElement;
-    
-            if (typeSelect.value === "percent") {
-                percentField.style.display = "block";
-                amountField.style.display = "none";
-            } else if (typeSelect.value === "amount") {
-                percentField.style.display = "none";
-                amountField.style.display = "block";
-            }
-        }
-    
-        document.addEventListener("DOMContentLoaded", function () {
-            const typeSelect = document.getElementById("id_type");
-            if (typeSelect) {
-                toggleDiscountFields();
-                typeSelect.addEventListener("change", toggleDiscountFields);
-            }
-        });
-    </script>
 
 
 
