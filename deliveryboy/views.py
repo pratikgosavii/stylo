@@ -87,7 +87,7 @@ class AssignedOrdersAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, order_id=None):
         if not getattr(request.user, "is_deliveryboy", False):
             return Response(
                 {"error": "Not a delivery boy account"},
@@ -99,6 +99,15 @@ class AssignedOrdersAPIView(APIView):
                 {"error": "Delivery boy profile not found"},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        if order_id:
+            try:
+                order = Order.objects.prefetch_related("items__product").get(id=order_id, delivery_boy=delivery_boy)
+                serializer = OrderSerializer(order, context={"request": request})
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except Order.DoesNotExist:
+                return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
         qs = (
             Order.objects.filter(delivery_boy=delivery_boy)
             .prefetch_related("items__product")
