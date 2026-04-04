@@ -1143,16 +1143,21 @@ class offersView(APIView):
     def get(self, request):
         from django.utils import timezone as tz
         from django.db.models import Q
-        from vendor.models import StoreOffer
+        from vendor.models import StoreOffer, vendor_store
         today = tz.now().date()
-        # Active store offers valid today (valid_from <= today, valid_to >= today or null)
-        offers_qs = StoreOffer.objects.filter(
-            is_active=True
-        ).filter(
-            Q(valid_from__isnull=True) | Q(valid_from__lte=today)
-        ).filter(
-            Q(valid_to__isnull=True) | Q(valid_to__gte=today)
-        ).order_by("-created_at")
+        
+        # Base filter: Active store offers valid today
+        filters = Q(is_active=True) & (Q(valid_from__isnull=True) | Q(valid_from__lte=today)) & (Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+        
+        store_id = request.query_params.get('store_id')
+        if store_id:
+            try:
+                store = vendor_store.objects.get(id=store_id)
+                filters &= Q(user=store.user)
+            except vendor_store.DoesNotExist:
+                return Response({"error": "Store not found"}, status=404)
+
+        offers_qs = StoreOffer.objects.filter(filters).order_by("-created_at")
         serializer = StoreOfferSerializer(offers_qs, many=True, context={"request": request})
         return Response(serializer.data)
     
@@ -1182,7 +1187,20 @@ class CartCouponAPIView(APIView):
 
 
     def get(self, request):
-        user, cart_items = self.get_cart_user(request.user)
+        from vendor.models import vendor_store
+        
+        store_id = request.query_params.get('store_id')
+        user = None
+        
+        if store_id:
+            try:
+                store = vendor_store.objects.get(id=store_id)
+                user = store.user
+            except vendor_store.DoesNotExist:
+                return Response({"error": "Store not found"}, status=404)
+        else:
+            user, cart_items = self.get_cart_user(request.user)
+
         if not user:
             return Response({"coupons": []}, status=200)
 
@@ -1231,11 +1249,15 @@ class CartCouponAPIView(APIView):
 
         # Calculate discount
         discount_amount = 0
-        if coupon_instance.type == "percent" and coupon_instance.discount_percentage:
+        discount_method = None
+
+        if coupon_instance.discount_percentage:
+            discount_method = "percent"
             discount_amount = (total_cart_amount * coupon_instance.discount_percentage) / 100
             if coupon_instance.max_discount:
                 discount_amount = min(discount_amount, coupon_instance.max_discount)
-        elif coupon_instance.type == "amount" and coupon_instance.discount_amount:
+        elif coupon_instance.discount_amount:
+            discount_method = "amount"
             discount_amount = coupon_instance.discount_amount
 
         # Ensure discount does not exceed total
@@ -1252,7 +1274,7 @@ class CartCouponAPIView(APIView):
             "discount_amount": discount_amount,
             "final_total": final_total,
             "coupon_type": coupon_instance.coupon_type,
-            "discount_method": coupon_instance.type,
+            "discount_method": discount_method,
             "discount_percentage": coupon_instance.discount_percentage,
             "discount_amount_field": coupon_instance.discount_amount,
             "max_discount": coupon_instance.max_discount,

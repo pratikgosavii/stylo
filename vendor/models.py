@@ -22,7 +22,7 @@ class coupon(models.Model):
     ]
 
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, null=True, blank=True)
-    coupon_type = models.CharField(max_length=10, choices=COUPON_TYPE_CHOICES, default='percent')  # 👈 Add this
+    coupon_type = models.CharField(max_length=10, choices=COUPON_TYPE_CHOICES, default='discount')  # 👈 Add this
     code = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=50)
     description = models.CharField(max_length=500, null=True, blank=True)
