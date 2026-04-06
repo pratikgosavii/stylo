@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from vendor.models import DeliveryBoy
 from customer.models import Order
 from customer.serializers import OrderSerializer
+from vendor.serializers import DeliveryBoySerializer
 
 User = get_user_model()
 
@@ -224,4 +225,28 @@ class ConfirmDeliveryByOTPAPIView(APIView):
         order.delivery_otp = None
         order.save(update_fields=["status", "delivery_otp"])
         serializer = OrderSerializer(order, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class DeliveryBoyProfileAPIView(APIView):
+    """
+    GET /deliveryboy/me/
+    Get the logged-in delivery boy's profile information.
+    Auth: delivery boy JWT.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not getattr(request.user, "is_deliveryboy", False):
+            return Response(
+                {"error": "Not a delivery boy account"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        delivery_boy = DeliveryBoy.objects.filter(account_user=request.user).first()
+        if not delivery_boy:
+            return Response(
+                {"error": "Delivery boy profile not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = DeliveryBoySerializer(delivery_boy, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)

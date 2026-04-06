@@ -4,7 +4,9 @@ from .views import (
     AssignedOrdersAPIView,
     StartDeliveryAPIView,
     ConfirmDeliveryByOTPAPIView,
+    ConfirmDeliveryByOTPAPIView,
     MarkOrderReachedAPIView,
+    DeliveryBoyProfileAPIView,
 )
 
 urlpatterns = [
@@ -14,4 +16,5 @@ urlpatterns = [
     path("orders/<int:order_id>/start-delivery/", StartDeliveryAPIView.as_view(), name="deliveryboy-start-delivery"),
     path("orders/<int:order_id>/mark-reached/", MarkOrderReachedAPIView.as_view(), name="deliveryboy-mark-reached"),
     path("orders/<int:order_id>/confirm-delivery/", ConfirmDeliveryByOTPAPIView.as_view(), name="deliveryboy-confirm-delivery"),
+    path("me/", DeliveryBoyProfileAPIView.as_view(), name="deliveryboy-me"),
 ]
