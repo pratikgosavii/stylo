@@ -356,6 +356,38 @@ class StoreWorkingHourViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return StoreWorkingHour.objects.filter(user=self.request.user).order_by('id')
 
+    def create(self, request, *args, **kwargs):
+        """
+        Supports bulk creation/update of working hours.
+        Expects a single dictionary or a list of dictionaries.
+        """
+        data = request.data
+        if not isinstance(data, list):
+            return super().create(request, *args, **kwargs)
+
+        # Bulk upsert logic
+        user = request.user
+        response_data = []
+        
+        for item in data:
+            day = item.get('day')
+            if not day:
+                continue
+            
+            obj, created = StoreWorkingHour.objects.update_or_create(
+                user=user,
+                day=day,
+                defaults={
+                    'open_time': item.get('open_time') or None,
+                    'close_time': item.get('close_time') or None,
+                    'is_open': item.get('is_open', True),
+                }
+            )
+            response_data.append(obj)
+            
+        serializer = self.get_serializer(response_data, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def perform_create(self, serializer):
         # Automatically assign logged-in user
         serializer.save(user=self.request.user)
