@@ -82,6 +82,12 @@ REST_FRAMEWORK = {
 }
 
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://manvinortech.stylooexpress.in",
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # # firebase_config.py
 import os
 from firebase_admin import credentials, initialize_app
