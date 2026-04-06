@@ -2382,7 +2382,7 @@ class CustomerProductReviewViewSet(viewsets.ModelViewSet):
             raise ValidationError("You can only review products you have purchased.")
 
         # Ensure order was completed (delivery) before review
-        if getattr(order_item.order, "status", None) != "completed":
+        if getattr(order_item.order, "status", None) != "delivered":
             raise ValidationError("You can only review after delivery.")
 
         review = serializer.save(user=user)
