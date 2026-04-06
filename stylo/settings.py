@@ -70,6 +70,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000", 
     "http://localhost:8081", # React frontend
     "http://localhost:5173/", # React frontend
+    "manvinortech.stylooexpress.in",
+    "www.manvinortech.stylooexpress.in",
 ]
 
 REST_FRAMEWORK = {
