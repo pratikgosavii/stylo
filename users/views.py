@@ -655,11 +655,11 @@ class UserProfileViewSet(viewsets.ViewSet):
         # Check key vendor_store fields are present
         key_fields = [
             "name", "profile_image"
-            
         ]
         for field in key_fields:
             val = getattr(store, field, None)
-            if val is None or (isinstance(val, str) and not val.strip()):
+            # Check if field is empty (works for files/images) or has the default placeholder name
+            if not val or (isinstance(val, str) and (not val.strip() or val == "My Store")):
                 return False
         return True
 
